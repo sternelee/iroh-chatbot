@@ -8,25 +8,50 @@
   } from '@/components/ai-elements/conversation'
   import {
     Message,
+    MessageAction,
+    MessageActions,
+    MessageAttachment,
+    MessageAttachments,
+    MessageAvatar,
+    MessageBranch,
+    MessageBranchContent,
+    MessageBranchNext,
+    MessageBranchPage,
+    MessageBranchPrevious,
+    MessageBranchSelector,
     MessageContent,
     MessageResponse,
-    MessageAvatar,
-    MessageActions,
-    MessageAction
+    MessageToolbar,
   } from '@/components/ai-elements/message'
   import {
     PromptInput,
-    PromptInputSubmit,
-    PromptInputTextarea,
+    PromptInputAttachment,
     PromptInputAttachments,
-    PromptInputActionMenu,
-    PromptInputActionMenuTrigger,
-    PromptInputActionMenuContent,
-    PromptInputActionMenuItem,
+    PromptInputBody,
+    PromptInputButton,
+    PromptInputCommand,
+    PromptInputCommandEmpty,
+    PromptInputCommandGroup,
+    PromptInputCommandInput,
+    PromptInputCommandItem,
+    PromptInputCommandList,
+    PromptInputCommandSeparator,
+    PromptInputFooter,
+    PromptInputHeader,
+    PromptInputHoverCard,
+    PromptInputHoverCardContent,
+    PromptInputHoverCardTrigger,
+    PromptInputProvider,
+    PromptInputSubmit,
+    PromptInputTab,
+    PromptInputTabBody,
+    PromptInputTabItem,
+    PromptInputTabLabel,
+    PromptInputTextarea,
+    PromptInputTools,
   } from '@/components/ai-elements/prompt-input'
   import { Button } from '@/components/ui/button'
   import { Input } from '@/components/ui/input'
-  import { Textarea } from '@/components/ui/textarea'
   import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
   import {
     Select,
@@ -43,7 +68,6 @@
     DialogHeader,
     DialogTitle,
   } from '@/components/ui/dialog'
-  import { Separator } from '@/components/ui/separator'
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -51,19 +75,13 @@
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu'
-  import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-  } from '@/components/ui/tooltip'
+  import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
   import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarGroup,
     SidebarGroupAction,
-    SidebarGroupContent,
     SidebarGroupLabel,
     SidebarHeader,
     SidebarInput,
@@ -73,9 +91,6 @@
     SidebarMenuBadge,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarMenuSubButton,
-    SidebarMenuSubItem,
     SidebarProvider,
     SidebarRail,
     SidebarSeparator,
@@ -84,12 +99,8 @@
   } from '@/components/ui/sidebar'
   import {
     Bot,
-    Send,
     Plus,
-    Search,
     Trash2,
-    RotateCcw,
-    MessageSquare,
     Brain,
     Cpu,
     Sparkles,
@@ -104,11 +115,39 @@
     Paperclip,
     Mic,
     Square,
-    ChevronDown,
     ChevronRight,
     History,
-    MessageCircle,
+    LogOut,
+    AtSign,
+    Ruler,
+    Files,
+    Globe,
+    Image,
+    Check,
+    ThumbsUp,
+    ThumbsDown,
   } from 'lucide-vue-next'
+  import type { PromptInputMessage } from '@/components/ai-elements/prompt-input'
+
+  interface Attachment {
+    type: 'file'
+    url: string
+    mediaType?: string
+    filename?: string
+  }
+
+  interface Version {
+    id: string
+    content: string
+  }
+
+  interface EnhancedMessage {
+    key: string
+    from: 'user' | 'assistant'
+    versions?: Version[]
+    content?: string
+    attachments?: Attachment[]
+  }
 
   interface ChatMessage {
     id: string
@@ -129,9 +168,10 @@
 
   const input = ref('')
   const messages = ref<ChatMessage[]>([])
+  const enhancedMessages = ref<EnhancedMessage[]>([])
   const conversations = ref<Conversation[]>([])
   const currentConversationId = ref<string>('')
-  const sidebarOpen = ref(false)
+  const _sidebarOpen = ref(false)
   const searchQuery = ref('')
   const status = ref<'idle' | 'loading' | 'error'>('idle')
   const error = ref<string | null>(null)
@@ -142,6 +182,23 @@
   const darkMode = ref(false)
   const isRecording = ref(false)
   const attachments = ref<File[]>([])
+  const settingsDialogOpen = ref(false)
+
+  // Enhanced message features
+  const liked = ref<Record<string, boolean>>({})
+  const disliked = ref<Record<string, boolean>>({})
+
+  // Cursor-style state
+  const modelSelectorOpen = ref(false)
+  const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+  const selectedModelData = computed(() => models.find((m) => m.id === selectedModel.value))
+
+  const user = ref({
+    email: 'user@example.com',
+    name: 'User Name',
+    avatar: 'https://avatars.githubusercontent.com/u/1000000?v=4', // Placeholder avatar
+  })
 
   // Mobile overlay component with sidebar context
   const MobileOverlay = defineComponent({
@@ -155,10 +212,85 @@
         class="lg:hidden fixed inset-0 z-40 bg-black/50"
         @click="setOpen(false)"
       ></div>
-    `
+    `,
   })
 
-  // Model options
+  // Cursor-style model definitions
+  const models = [
+    {
+      id: 'gpt-4o',
+      name: 'GPT-4o',
+      chef: 'OpenAI',
+      chefSlug: 'openai',
+      providers: ['openai', 'azure'],
+    },
+    {
+      id: 'gpt-4o-mini',
+      name: 'GPT-4o Mini',
+      chef: 'OpenAI',
+      chefSlug: 'openai',
+      providers: ['openai', 'azure'],
+    },
+    {
+      id: 'claude-opus-4-20250514',
+      name: 'Claude 4 Opus',
+      chef: 'Anthropic',
+      chefSlug: 'anthropic',
+      providers: ['anthropic', 'azure', 'google', 'amazon-bedrock'],
+    },
+    {
+      id: 'claude-sonnet-4-20250514',
+      name: 'Claude 4 Sonnet',
+      chef: 'Anthropic',
+      chefSlug: 'anthropic',
+      providers: ['anthropic', 'azure', 'google', 'amazon-bedrock'],
+    },
+    {
+      id: 'gemini-2.0-flash-exp',
+      name: 'Gemini 2.0 Flash',
+      chef: 'Google',
+      chefSlug: 'google',
+      providers: ['google'],
+    },
+  ]
+
+  // Constants for Cursor-style behavior
+  const SUBMITTING_TIMEOUT = 200
+  const STREAMING_TIMEOUT = 2000
+
+  // Sample data for demonstration
+  const sampleFiles = {
+    activeTabs: [{ path: 'prompt-input.tsx', location: 'packages/elements/src' }],
+    recents: [
+      { path: 'queue.tsx', location: 'apps/test/app/examples' },
+      { path: 'queue.tsx', location: 'packages/elements/src' },
+    ],
+    added: [
+      { path: 'prompt-input.tsx', location: 'packages/elements/src' },
+      { path: 'queue.tsx', location: 'apps/test/app/examples' },
+      { path: 'queue.tsx', location: 'packages/elements/src' },
+    ],
+    filesAndFolders: [
+      { path: 'prompt-input.tsx', location: 'packages/elements/src' },
+      { path: 'queue.tsx', location: 'apps/test/app/examples' },
+    ],
+    code: [{ path: 'prompt-input.tsx', location: 'packages/elements/src' }],
+    docs: [{ path: 'README.md', location: 'packages/elements' }],
+  }
+
+  const sampleTabs = {
+    active: [{ path: 'packages/elements/src/task-queue-panel.tsx' }],
+    recents: [
+      { path: 'apps/test/app/examples/task-queue-panel.tsx' },
+      { path: 'apps/test/app/page.tsx' },
+      { path: 'packages/elements/src/task.tsx' },
+      { path: 'apps/test/app/examples/prompt-input.tsx' },
+      { path: 'packages/elements/src/queue.tsx' },
+      { path: 'apps/test/app/examples/queue.tsx' },
+    ],
+  }
+
+  // Model options (legacy, kept for compatibility)
   const modelOptions = [
     {
       id: 'gpt-4',
@@ -217,8 +349,8 @@
     // Create first conversation
     const conv1: Conversation = {
       id: '1',
-      title: 'Welcome to Iroh Chat',
-      lastMessage: 'Hello! How can I assist you today?',
+      title: 'Vue 3 Composition API Guide',
+      lastMessage: 'The Vue Composition API is a powerful feature...',
       timestamp: now,
       model: 'gpt-3.5-turbo',
       messageCount: 2,
@@ -227,8 +359,8 @@
     // Add another sample conversation
     const conv2: Conversation = {
       id: '2',
-      title: 'Project Discussion',
-      lastMessage: 'Let me help you with that feature.',
+      title: 'Frontend Development Discussion',
+      lastMessage: "I'd be happy to help with that feature...",
       timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
       model: 'gpt-4',
       messageCount: 5,
@@ -236,6 +368,137 @@
 
     conversations.value = [conv1, conv2]
     currentConversationId.value = conv1.id
+
+    // Initialize enhanced messages for demo
+    enhancedMessages.value = [
+      {
+        key: 'msg-1',
+        from: 'user',
+        content: 'How do Vue composition APIs work and when should I use them?',
+        attachments: [
+          {
+            type: 'file',
+            url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=400&fit=crop',
+            mediaType: 'image/jpeg',
+            filename: 'palace-of-fine-arts.jpg',
+          },
+          {
+            type: 'file',
+            url: '',
+            mediaType: 'application/pdf',
+            filename: 'vue-guide.pdf',
+          },
+        ],
+      },
+      {
+        key: 'msg-2',
+        from: 'assistant',
+        versions: [
+          {
+            id: 'version-1',
+            content: `# Vue Composition API Guide
+
+The Vue Composition API is a set of functions that let you use Vue's reactivity and lifecycle features inside the \`setup()\` function of your components. Here's what you need to know:
+
+## Core Composables
+
+### ref()
+Creates reactive primitive values:
+
+\`\`\`vue
+<script setup>
+import { ref } from 'vue'
+
+const count = ref(0)
+<\/script>
+
+<template>
+  <button @click="count++">Count: {{ count }}</button>
+</template>
+\`\`\`
+
+### watch()
+Runs side effects when reactive values change:
+
+\`\`\`vue
+<script setup>
+import { ref, watch } from 'vue'
+
+const count = ref(0)
+
+watch(count, (newVal, oldVal) => {
+  console.log(\`Count changed from \${oldVal} to \${newVal}\`)
+})
+<\/script>
+\`\`\`
+
+## When to Use the Composition API
+
+- ✅ **For complex logic** — Easier to organize and reuse reactive state
+- ✅ **For reusable code** — Create your own composables (like custom hooks)
+- ✅ **For TypeScript support** — More type-friendly than Options API
+- ❌ **For simple components** — The Options API might be enough
+
+Would you like to explore more advanced composables like \`computed\` or \`onMounted\`?`,
+          },
+          {
+            id: 'version-2',
+            content: `The Vue Composition API is a modern way to write components in Vue 3. It replaces the Options API's data, methods, and computed properties with a single \`setup()\` function.
+
+Here are the most common composables:
+
+- **ref()** — creates reactive primitive values
+- **reactive()** — makes entire objects reactive
+- **computed()** — creates derived reactive values
+- **watch()** — runs side effects on data changes
+- **onMounted()** — lifecycle hook for when a component is mounted
+
+Here's a simple example:
+
+\`\`\`vue
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const count = ref(0)
+
+onMounted(() => {
+  console.log('Component mounted!')
+})
+<\/script>
+
+<template>
+  <button @click="count++">Clicked {{ count }} times</button>
+</template>
+\`\`\`
+
+Which specific composable would you like to learn more about?`,
+          },
+          {
+            id: 'version-3',
+            content: `Absolutely! The Vue Composition API brings a new, more flexible way to manage logic and reactivity in Vue components.
+
+## Key Benefits
+
+1. **Cleaner code organization** — Group related logic by feature
+2. **Reusable logic** — Build and share your own composables
+3. **Better TypeScript support** — Stronger typing than the Options API
+
+## Most Popular Composables
+
+| Composable | Purpose |
+|-------------|----------|
+| ref | Reactive primitive values |
+| reactive | Reactive objects |
+| computed | Derived reactive values |
+| watch | React to data changes |
+| onMounted | Run code when component mounts |
+| onUnmounted | Cleanup logic when destroyed |
+
+The beauty of the Composition API is that it lets you reuse stateful logic without changing your component structure. Want to dive into a specific composable?`,
+          },
+        ],
+      },
+    ]
 
     // Load messages for current conversation
     loadConversationMessages(conv1.id)
@@ -328,7 +591,7 @@
   }
 
   // Format timestamp
-  function formatTimestamp(date: Date): string {
+  function _formatTimestamp(date: Date): string {
     const now = new Date()
     const diff = now.getTime() - date.getTime()
 
@@ -394,6 +657,63 @@
     }
   }
 
+  // Cursor-style submit handler
+  function handleCursorSubmit(message: PromptInputMessage) {
+    const hasText = !!message.text
+    const hasAttachments = !!message.files?.length
+
+    if (!hasText && !hasAttachments) {
+      return
+    }
+
+    // Convert to legacy format
+    const userMessage = message.text || 'File uploaded'
+
+    // Add user message
+    messages.value.push({
+      id: Date.now().toString(),
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date(),
+      conversationId: currentConversationId.value,
+    })
+
+    // Update conversation info
+    const convIndex = conversations.value.findIndex(
+      (conv) => conv.id === currentConversationId.value
+    )
+    if (convIndex > -1) {
+      conversations.value[convIndex].lastMessage = userMessage
+      conversations.value[convIndex].timestamp = new Date()
+      conversations.value[convIndex].messageCount += 1
+    }
+
+    status.value = 'loading'
+
+    // Simulate Cursor-style async behavior
+    setTimeout(() => {
+      status.value = 'loading'
+    }, SUBMITTING_TIMEOUT)
+
+    setTimeout(() => {
+      const botResponse = getBotResponse(userMessage)
+      messages.value.push({
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: botResponse,
+        timestamp: new Date(),
+        conversationId: currentConversationId.value,
+      })
+
+      if (convIndex > -1) {
+        conversations.value[convIndex].lastMessage = botResponse
+        conversations.value[convIndex].timestamp = new Date()
+      }
+
+      status.value = 'idle'
+    }, STREAMING_TIMEOUT)
+  }
+
   function getBotResponse(_userMessage: string): string {
     const responses = [
       "That's interesting! Tell me more about that.",
@@ -420,8 +740,8 @@
   )
 
   // Additional methods
-  function editConversationTitle(conversationId: string) {
-    const conversation = conversations.value.find(c => c.id === conversationId)
+  function editConversationTitle(_conversationId: string) {
+    const conversation = conversations.value.find((c) => c.id === _conversationId)
     if (conversation) {
       const newTitle = prompt('Enter new title:', conversation.title)
       if (newTitle && newTitle.trim()) {
@@ -430,13 +750,13 @@
     }
   }
 
-  function shareConversation(conversationId: string) {
+  function shareConversation(_conversationId: string) {
     // Implement sharing functionality
     alert('Share functionality coming soon!')
   }
 
-  function handleFileUpload(event: Event) {
-    const files = (event.target as HTMLInputElement).files
+  function handleFileUpload(_event: Event) {
+    const files = (_event.target as HTMLInputElement).files
     if (files) {
       attachments.value = Array.from(files)
     }
@@ -452,17 +772,63 @@
     alert('Regenerate response functionality coming soon!')
   }
 
-  function copyMessage(messageId: string) {
-    // Implement message copying
+  function copyMessage(_messageId: string) {
+    // Legacy function - using enhanced version
     alert('Copy message functionality coming soon!')
+  }
+
+  // Enhanced message functions
+  function handleCopy(content: string) {
+    navigator.clipboard.writeText(content)
+  }
+
+  function handleRetry() {
+    console.log('Retrying...')
+    // Implement retry logic
+  }
+
+  function toggleLike(key: string) {
+    liked.value = {
+      ...liked.value,
+      [key]: !liked.value[key],
+    }
+    // Reset dislike when liked
+    if (liked.value[key]) {
+      disliked.value = {
+        ...disliked.value,
+        [key]: false,
+      }
+    }
+  }
+
+  function toggleDislike(key: string) {
+    disliked.value = {
+      ...disliked.value,
+      [key]: !disliked.value[key],
+    }
+    // Reset like when disliked
+    if (disliked.value[key]) {
+      liked.value = {
+        ...liked.value,
+        [key]: false,
+      }
+    }
+  }
+
+  function hasMultipleVersions(message: EnhancedMessage) {
+    return message.versions && message.versions.length > 1
+  }
+
+  function handleBranchChange(index: number) {
+    console.log('Branch changed to:', index)
   }
 
   function startNewChat() {
     createNewConversation()
   }
 
-  function loadChat(chatId: string) {
-    loadConversationMessages(chatId)
+  function loadChat(_chatId: string) {
+    createNewConversation()
   }
 
   function toggleTheme() {
@@ -472,7 +838,7 @@
   function clearChat() {
     if (currentConversationId.value) {
       messages.value = []
-      const convIndex = conversations.value.findIndex(c => c.id === currentConversationId.value)
+      const convIndex = conversations.value.findIndex((c) => c.id === currentConversationId.value)
       if (convIndex > -1) {
         conversations.value[convIndex].messageCount = 0
         conversations.value[convIndex].lastMessage = ''
@@ -481,11 +847,11 @@
   }
 
   // Computed property for previous chats
-  const previousChats = computed(() => {
-    return conversations.value.filter(conv => conv.id !== currentConversationId.value)
+  const _previousChats = computed(() => {
+    return conversations.value.filter((conv) => conv.id !== currentConversationId.value)
   })
 
-  const isDark = computed(() => darkMode.value)
+  const _isDark = computed(() => darkMode.value)
 
   // Initialize on mount
   if (typeof window !== 'undefined') {
@@ -497,7 +863,7 @@
   <TooltipProvider>
     <SidebarProvider>
       <div
-        class="flex h-screen font-sans bg-background"
+        class="flex h-screen font-sans bg-background w-full"
         :class="darkMode ? 'dark' : ''"
         :style="{
           fontFamily:
@@ -510,7 +876,9 @@
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton size="lg" @click="createNewConversation">
-                  <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 text-sidebar-primary-foreground">
+                  <div
+                    class="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 text-sidebar-primary-foreground"
+                  >
                     <Bot class="size-4" />
                   </div>
                   <div class="flex flex-col gap-0.5 text-left">
@@ -523,7 +891,11 @@
 
             <SidebarSeparator class="mx-2.5" />
 
-            <SidebarInput placeholder="Search conversations..." v-model="searchQuery" class="mt-2" />
+            <SidebarInput
+              placeholder="Search conversations..."
+              v-model="searchQuery"
+              class="mt-2"
+            />
           </SidebarHeader>
 
           <SidebarContent>
@@ -597,13 +969,13 @@
               <SidebarGroupLabel>Settings</SidebarGroupLabel>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton>
+                  <SidebarMenuButton @click="settingsDialogOpen = true">
                     <Brain class="size-4" />
                     <span>AI Models</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton>
+                  <SidebarMenuButton @click="settingsDialogOpen = true">
                     <Settings class="size-4" />
                     <span>Preferences</span>
                   </SidebarMenuButton>
@@ -620,38 +992,48 @@
           </SidebarContent>
 
           <SidebarFooter>
-            <SidebarMenu>
+            <SidebarGroup>
               <SidebarMenuItem>
-                <SidebarMenuButton as-child>
-                  <Select v-model="selectedModel">
-                    <SelectTrigger class="w-full justify-start">
-                      <component
-                        :is="modelOptions.find(m => m.id === selectedModel)?.icon"
-                        :class="`w-4 h-4 ${modelOptions.find(m => m.id === selectedModel)?.color}`"
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <SidebarMenuButton class="h-auto justify-start py-2 group">
+                      <Avatar class="h-7 w-7">
+                        <AvatarImage :src="user.avatar" />
+                        <AvatarFallback>{{ user.name.charAt(0) }}</AvatarFallback>
+                      </Avatar>
+                      <div class="flex flex-col items-start gap-px overflow-hidden">
+                        <p class="w-full truncate text-sm font-medium">
+                          {{ user.name }}
+                        </p>
+                        <p class="w-full truncate text-xs text-muted-foreground">
+                          {{ user.email }}
+                        </p>
+                      </div>
+                      <ChevronRight
+                        class="ml-auto h-4 w-4 shrink-0 opacity-0 transition-all group-hover:opacity-100 peer-data-[state=open]:opacity-100"
                       />
-                      {{ modelOptions.find(m => m.id === selectedModel)?.name }}
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem v-for="model in modelOptions" :key="model.id" :value="model.id">
-                        <div class="flex items-center gap-3">
-                          <component :is="model.icon" :class="`w-4 h-4 ${model.color}`" />
-                          <div>
-                            <div class="font-medium">{{ model.name }}</div>
-                            <div class="text-xs text-muted-foreground">{{ model.description }}</div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </SidebarMenuButton>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="end" class="w-56">
+                    <DropdownMenuItem>
+                      <Settings class="w-4 h-4 mr-2" />
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem @click="toggleTheme">
+                      <Sun v-if="!darkMode" class="size-4 mr-2" />
+                      <Moon v-else class="size-4 mr-2" />
+                      <span>{{ darkMode ? 'Dark Mode' : 'Light Mode' }}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem class="text-destructive">
+                      <LogOut class="w-4 h-4 mr-2" />
+                      Log Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </SidebarMenuItem>
-            </SidebarMenu>
-
-            <SidebarSeparator class="mx-2.5" />
-
-            <div class="text-xs text-muted-foreground text-center px-2.5 pb-2">
-              {{ filteredConversations.length }} conversations
-            </div>
+            </SidebarGroup>
           </SidebarFooter>
         </Sidebar>
 
@@ -679,238 +1061,425 @@
                     <h1 class="text-lg font-semibold">
                       {{ currentConversation?.title || 'New Chat' }}
                     </h1>
-                    <p class="text-sm text-muted-foreground hidden sm:block">
-                      {{
-                        currentConversation?.model
-                          ? modelOptions.find((m) => m.id === currentConversation.model)?.name
-                          : 'AI Assistant'
-                      }}
-                    </p>
                   </div>
                 </div>
 
-              <div class="flex items-center gap-2">
-                <!-- Status Indicator -->
-                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm bg-muted">
-                  <span
-                    class="w-2 h-2 rounded-full"
-                    :class="[
-                      status === 'loading' ? 'bg-yellow-500 animate-pulse' :
-                      status === 'error' ? 'bg-red-500' :
-                      'bg-green-500'
-                    ]"
-                  ></span>
-                  <span class="hidden sm:inline">
-                    {{
-                      status === 'loading' ? 'Thinking...' :
-                      status === 'error' ? 'Error' :
-                      'Ready'
-                    }}
-                  </span>
-                </div>
+                <div class="flex items-center gap-2">
+                  <!-- Status Indicator -->
+                  <div class="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm bg-muted">
+                    <span
+                      class="w-2 h-2 rounded-full"
+                      :class="[
+                        status === 'loading'
+                          ? 'bg-yellow-500 animate-pulse'
+                          : status === 'error'
+                            ? 'bg-red-500'
+                            : 'bg-green-500',
+                      ]"
+                    ></span>
+                    <span class="hidden sm:inline">
+                      {{
+                        status === 'loading'
+                          ? 'Thinking...'
+                          : status === 'error'
+                            ? 'Error'
+                            : 'Ready'
+                      }}
+                    </span>
+                  </div>
 
-                <!-- Actions -->
-                <DropdownMenu>
-                  <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical class="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem @click="regenerateResponse">
-                      <RefreshCw class="w-4 h-4 mr-2" />
-                      Regenerate
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Share2 class="w-4 h-4 mr-2" />
-                      Share
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Settings class="w-4 h-4 mr-2" />
-                      Settings
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  <!-- Actions -->
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical class="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem @click="regenerateResponse">
+                        <RefreshCw class="w-4 h-4 mr-2" />
+                        Regenerate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Share2 class="w-4 h-4 mr-2" />
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem>
+                        <Settings class="w-4 h-4 mr-2" />
+                        Settings
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-      <!-- Chat Area -->
-        <div class="flex-1 overflow-hidden bg-muted/30">
-          <div class="h-full flex flex-col">
-            <!-- Messages Container -->
-            <div
-              ref="messagesContainer"
-              class="flex-1 overflow-y-auto"
-              @scroll="handleScroll"
-            >
-              <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6">
-                <Conversation class="h-full">
-                  <ConversationContent>
-                    <ConversationEmptyState
-                      v-if="messages.length === 0"
-                      title="Start a conversation"
-                      description="Type a message below to begin chatting with your AI assistant"
-                    >
-                      <Avatar class="w-16 h-16 mb-4">
-                        <AvatarFallback>
-                          <Bot class="w-8 h-8 text-muted-foreground" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <h3 class="text-lg font-semibold mb-2">Hello! I'm your AI assistant</h3>
-                      <p class="text-muted-foreground text-center max-w-md">
-                        How can I help you today? Feel free to ask me anything, from coding questions to creative writing.
-                      </p>
-                    </ConversationEmptyState>
-
-                    <Message
-                      v-for="message in messages"
-                      :key="message.id"
-                      :from="message.role"
-                      class="mb-6"
-                    >
-                      <MessageAvatar class="mr-3">
-                        <Avatar class="h-8 w-8">
-                          <AvatarFallback :class="[
-                            message.role === 'user'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-secondary text-secondary-foreground'
-                          ]">
-                            {{ message.role === 'user' ? 'U' : 'AI' }}
+          <!-- Chat Area -->
+          <div class="flex-1 overflow-hidden bg-muted/30">
+            <div class="h-full flex flex-col">
+              <!-- Messages Container -->
+              <div ref="messagesContainer" class="flex-1 overflow-y-auto" @scroll="handleScroll">
+                <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6">
+                  <Conversation class="h-full">
+                    <ConversationContent>
+                      <ConversationEmptyState
+                        v-if="messages.length === 0"
+                        title="Start a conversation"
+                        description="Type a message below to begin chatting with your AI assistant"
+                      >
+                        <Avatar class="w-16 h-16 mb-4">
+                          <AvatarFallback>
+                            <Bot class="w-8 h-8 text-muted-foreground" />
                           </AvatarFallback>
                         </Avatar>
-                      </MessageAvatar>
+                        <h3 class="text-lg font-semibold mb-2">Hello! I'm your AI assistant</h3>
+                        <p class="text-muted-foreground text-center max-w-md">
+                          How can I help you today? Feel free to ask me anything, from coding
+                          questions to creative writing.
+                        </p>
+                      </ConversationEmptyState>
 
-                      <MessageContent class="flex-1">
-                        <MessageResponse>
-                          <div class="rounded-lg p-4" :class="[
-                            message.role === 'user'
-                              ? 'bg-primary text-primary-foreground ml-auto'
-                              : 'bg-muted'
-                          ]">
-                            {{ message.content }}
-                          </div>
-                        </MessageResponse>
+                      <Message
+                        v-for="message in enhancedMessages"
+                        :key="message.key"
+                        :from="message.from"
+                      >
+                        <!-- Multiple versions with branch selector -->
+                        <MessageBranch
+                          v-if="hasMultipleVersions(message)"
+                          :default-branch="0"
+                          @branch-change="handleBranchChange"
+                        >
+                          <MessageBranchContent>
+                            <MessageContent v-for="version in message.versions" :key="version.id">
+                              <MessageResponse :content="version.content" />
+                            </MessageContent>
+                          </MessageBranchContent>
 
-                        <MessageActions class="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MessageAction @click="copyMessage(message.id)">
-                            <Copy class="w-4 h-4" />
-                          </MessageAction>
-                          <MessageAction @click="regenerateResponse" v-if="message.role === 'assistant'">
-                            <RefreshCw class="w-4 h-4" />
-                          </MessageAction>
-                        </MessageActions>
-                      </MessageContent>
-                    </Message>
-                  </ConversationContent>
+                          <MessageToolbar v-if="message.from === 'assistant'">
+                            <MessageBranchSelector :from="message.from">
+                              <MessageBranchPrevious />
+                              <MessageBranchPage />
+                              <MessageBranchNext />
+                            </MessageBranchSelector>
 
-                  <ConversationScrollButton />
-                </Conversation>
+                            <MessageActions>
+                              <MessageAction
+                                label="Retry"
+                                tooltip="Regenerate response"
+                                @click="handleRetry"
+                              >
+                                <RefreshCw class="size-4" />
+                              </MessageAction>
+
+                              <MessageAction
+                                label="Like"
+                                tooltip="Like this response"
+                                @click="toggleLike(message.key)"
+                              >
+                                <ThumbsUp
+                                  class="size-4"
+                                  :fill="liked[message.key] ? 'currentColor' : 'none'"
+                                />
+                              </MessageAction>
+
+                              <MessageAction
+                                label="Dislike"
+                                tooltip="Dislike this response"
+                                @click="toggleDislike(message.key)"
+                              >
+                                <ThumbsDown
+                                  class="size-4"
+                                  :fill="disliked[message.key] ? 'currentColor' : 'none'"
+                                />
+                              </MessageAction>
+
+                              <MessageAction
+                                label="Copy"
+                                tooltip="Copy to clipboard"
+                                @click="
+                                  handleCopy(
+                                    message.versions?.find((v) => v.id === message.key)?.content ||
+                                      message.content ||
+                                      ''
+                                  )
+                                "
+                              >
+                                <Copy class="size-4" />
+                              </MessageAction>
+                            </MessageActions>
+                          </MessageToolbar>
+                        </MessageBranch>
+
+                        <!-- Single version without branch selector -->
+                        <div v-else>
+                          <MessageAttachments
+                            v-if="message.attachments && message.attachments.length > 0"
+                            class="mb-2"
+                          >
+                            <MessageAttachment
+                              v-for="attachment in message.attachments"
+                              :key="attachment.url"
+                              :data="{
+                                ...attachment,
+                                mediaType: attachment.mediaType ?? 'application/octet-stream',
+                              }"
+                            />
+                          </MessageAttachments>
+
+                          <MessageContent>
+                            <MessageResponse
+                              v-if="message.from === 'assistant'"
+                              :content="message.content"
+                            />
+                            <template v-else>
+                              {{ message.content }}
+                            </template>
+                          </MessageContent>
+
+                          <MessageActions v-if="message.from === 'assistant'">
+                            <MessageAction
+                              label="Retry"
+                              tooltip="Regenerate response"
+                              @click="handleRetry"
+                            >
+                              <RefreshCw class="size-4" />
+                            </MessageAction>
+
+                            <MessageAction
+                              label="Like"
+                              tooltip="Like this response"
+                              @click="toggleLike(message.key)"
+                            >
+                              <ThumbsUp
+                                class="size-4"
+                                :fill="liked[message.key] ? 'currentColor' : 'none'"
+                              />
+                            </MessageAction>
+
+                            <MessageAction
+                              label="Dislike"
+                              tooltip="Dislike this response"
+                              @click="toggleDislike(message.key)"
+                            >
+                              <ThumbsDown
+                                class="size-4"
+                                :fill="disliked[message.key] ? 'currentColor' : 'none'"
+                              />
+                            </MessageAction>
+
+                            <MessageAction
+                              label="Copy"
+                              tooltip="Copy to clipboard"
+                              @click="handleCopy(message.content || '')"
+                            >
+                              <Copy class="size-4" />
+                            </MessageAction>
+                          </MessageActions>
+                        </div>
+                      </Message>
+                    </ConversationContent>
+
+                    <ConversationScrollButton />
+                  </Conversation>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Input Area -->
-        <div class="bg-background/95 backdrop-blur-lg border-t p-4">
-          <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
-            <form @submit="handleSubmit">
-              <PromptInput class="relative group">
-                <div class="flex items-end gap-2 bg-muted/50 rounded-xl border border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                  <!-- Attachment Button -->
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <Button type="button" variant="ghost" size="icon" class="ml-2 mb-2">
-                        <Paperclip class="w-4 h-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Attach files</p>
-                    </TooltipContent>
-                  </Tooltip>
+          <!-- Input Area - Cursor Style -->
+          <div class="bg-background/95 backdrop-blur-lg border-t">
+            <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4">
+              <div class="flex size-full flex-col justify-end">
+                <PromptInputProvider @submit="handleCursorSubmit">
+                  <PromptInput global-drop multiple>
+                    <PromptInputHeader>
+                      <PromptInputHoverCard>
+                        <PromptInputHoverCardTrigger>
+                          <PromptInputButton class="!h-8" size="icon-sm" variant="outline">
+                            <AtSign class="text-muted-foreground" :size="12" />
+                          </PromptInputButton>
+                        </PromptInputHoverCardTrigger>
+                        <PromptInputHoverCardContent class="w-[400px] p-0">
+                          <PromptInputCommand>
+                            <PromptInputCommandInput
+                              class="border-none focus-visible:ring-0"
+                              placeholder="Add files, folders, docs..."
+                            />
+                            <PromptInputCommandList>
+                              <PromptInputCommandEmpty class="p-3 text-muted-foreground text-sm">
+                                No results found.
+                              </PromptInputCommandEmpty>
+                              <PromptInputCommandGroup heading="Added">
+                                <PromptInputCommandItem value="active-tabs">
+                                  <Globe />
+                                  <span>Active Tabs</span>
+                                  <span class="ml-auto text-muted-foreground">✓</span>
+                                </PromptInputCommandItem>
+                              </PromptInputCommandGroup>
+                              <PromptInputCommandSeparator />
+                              <PromptInputCommandGroup heading="Other Files">
+                                <PromptInputCommandItem
+                                  v-for="(file, index) in sampleFiles.added"
+                                  :key="`${file.path}-${index}`"
+                                  :value="file.path"
+                                >
+                                  <Globe class="text-primary" />
+                                  <div class="flex flex-col">
+                                    <span class="font-medium text-sm">
+                                      {{ file.path }}
+                                    </span>
+                                    <span class="text-muted-foreground text-xs">
+                                      {{ file.location }}
+                                    </span>
+                                  </div>
+                                </PromptInputCommandItem>
+                              </PromptInputCommandGroup>
+                            </PromptInputCommandList>
+                          </PromptInputCommand>
+                        </PromptInputHoverCardContent>
+                      </PromptInputHoverCard>
+                      <PromptInputHoverCard>
+                        <PromptInputHoverCardTrigger>
+                          <PromptInputButton size="sm" variant="outline">
+                            <Ruler class="text-muted-foreground" :size="12" />
+                            <span>1</span>
+                          </PromptInputButton>
+                        </PromptInputHoverCardTrigger>
+                        <PromptInputHoverCardContent class="divide-y overflow-hidden p-0">
+                          <div class="space-y-2 p-3">
+                            <p class="font-medium text-muted-foreground text-sm">
+                              Attached Project Rules
+                            </p>
+                            <p class="ml-4 text-muted-foreground text-sm">Always Apply:</p>
+                            <p class="ml-8 text-sm">ultracite.mdc</p>
+                          </div>
+                          <p class="bg-sidebar px-4 py-3 text-muted-foreground text-sm">
+                            Click to manage
+                          </p>
+                        </PromptInputHoverCardContent>
+                      </PromptInputHoverCard>
+                      <PromptInputHoverCard>
+                        <PromptInputHoverCardTrigger>
+                          <PromptInputButton size="sm" variant="outline">
+                            <Files class="text-muted-foreground" :size="12" />
+                            <span>1 Tab</span>
+                          </PromptInputButton>
+                        </PromptInputHoverCardTrigger>
+                        <PromptInputHoverCardContent class="w-[300px] space-y-4 px-0 py-3">
+                          <PromptInputTab>
+                            <PromptInputTabLabel>Active Tabs</PromptInputTabLabel>
+                            <PromptInputTabBody>
+                              <PromptInputTabItem v-for="tab in sampleTabs.active" :key="tab.path">
+                                <Globe class="text-primary" :size="16" />
+                                <span class="truncate" dir="rtl">
+                                  {{ tab.path }}
+                                </span>
+                              </PromptInputTabItem>
+                            </PromptInputTabBody>
+                          </PromptInputTab>
+                          <PromptInputTab>
+                            <PromptInputTabLabel>Recents</PromptInputTabLabel>
+                            <PromptInputTabBody>
+                              <PromptInputTabItem v-for="tab in sampleTabs.recents" :key="tab.path">
+                                <Globe class="text-primary" :size="16" />
+                                <span class="truncate" dir="rtl">
+                                  {{ tab.path }}
+                                </span>
+                              </PromptInputTabItem>
+                            </PromptInputTabBody>
+                          </PromptInputTab>
+                          <div class="border-t px-3 pt-2 text-muted-foreground text-xs">
+                            Only file paths are included
+                          </div>
+                        </PromptInputHoverCardContent>
+                      </PromptInputHoverCard>
+                      <PromptInputAttachments>
+                        <template #default="{ file }">
+                          <PromptInputAttachment :file="file" />
+                        </template>
+                      </PromptInputAttachments>
+                    </PromptInputHeader>
+                    <PromptInputBody>
+                      <PromptInputTextarea
+                        ref="textareaRef"
+                        placeholder="Plan, search, build anything"
+                      />
+                    </PromptInputBody>
+                    <PromptInputFooter>
+                      <PromptInputTools>
+                        <!-- Model Selector using Select component -->
+                        <Select v-model="selectedModel">
+                          <SelectTrigger as-child>
+                            <PromptInputButton>
+                              <component
+                                :is="modelOptions.find((m) => m.id === selectedModel)?.icon"
+                                :class="`w-4 h-4 mr-2 ${modelOptions.find((m) => m.id === selectedModel)?.color}`"
+                              />
+                              <span>
+                                {{ modelOptions.find((m) => m.id === selectedModel)?.name }}
+                              </span>
+                            </PromptInputButton>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem
+                              v-for="model in modelOptions"
+                              :key="model.id"
+                              :value="model.id"
+                              @select="
+                                () => {
+                                  selectedModel = model.id
+                                }
+                              "
+                            >
+                              <div class="flex items-center gap-3">
+                                <component :is="model.icon" :class="`w-4 h-4 ${model.color}`" />
+                                <div>
+                                  <div class="font-medium">{{ model.name }}</div>
+                                  <div class="text-xs text-muted-foreground">
+                                    {{ model.description }}
+                                  </div>
+                                </div>
+                                <Check v-if="selectedModel === model.id" class="ml-auto size-4" />
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </PromptInputTools>
+                      <div class="flex items-center gap-2">
+                        <Button size="icon-sm" variant="ghost">
+                          <Image class="text-muted-foreground" :size="16" />
+                        </Button>
+                        <PromptInputSubmit
+                          class="!h-8"
+                          :status="status === 'loading' ? 'streaming' : 'ready'"
+                        />
+                      </div>
+                    </PromptInputFooter>
+                  </PromptInput>
+                </PromptInputProvider>
+              </div>
 
-                  <!-- Text Input -->
-                  <PromptInputTextarea
-                    v-model="input"
-                    placeholder="Type your message here..."
-                    class="flex-1 resize-none border-0 bg-transparent py-3 px-2 focus:ring-0 min-h-[56px] max-h-32"
-                    :disabled="status === 'loading'"
-                    @keydown.enter.prevent="handleSubmit"
-                  />
-
-                  <!-- Voice Input Button -->
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        class="mr-2 mb-2"
-                        @click="toggleRecording"
-                        :class="isRecording ? 'text-red-500' : ''"
-                      >
-                        <Mic v-if="!isRecording" class="w-4 h-4" />
-                        <Square v-else class="w-4 h-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{{ isRecording ? 'Stop recording' : 'Voice input' }}</p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <!-- Submit Button -->
-                  <PromptInputSubmit
-                    :status="status === 'loading' ? 'streaming' : 'ready'"
-                    :disabled="!input.trim() || status === 'loading'"
-                    class="m-2"
-                    @click="handleSubmit"
-                  />
-                </div>
-
-                <!-- Attachments Preview -->
-                <PromptInputAttachments v-if="attachments.length > 0" class="mt-2">
-                  <div class="flex flex-wrap gap-2">
-                    <div
-                      v-for="(file, index) in attachments"
-                      :key="index"
-                      class="flex items-center gap-2 bg-muted px-2 py-1 rounded-md text-sm"
-                    >
-                      <Paperclip class="w-3 h-3" />
-                      <span>{{ file.name }}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
-                        @click="attachments.splice(index, 1)"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  </div>
-                </PromptInputAttachments>
-              </PromptInput>
-            </form>
-
-            <!-- Error Display -->
-            <div
-              v-if="error"
-              class="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm"
-            >
-              <p class="m-0">Error: {{ error }}</p>
+              <!-- Error Display -->
+              <div
+                v-if="error"
+                class="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm"
+              >
+                <p class="m-0">Error: {{ error }}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-    <!-- Footer -->
-        <footer class="bg-muted/50 border-t px-4 py-2">
-          <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 text-center">
-            <p class="text-xs text-muted-foreground m-0">
-              Powered by AI Elements Vue • Built with Tauri + Vue 3
-            </p>
-          </div>
-        </footer>
+          <!-- Footer -->
+          <footer class="bg-muted/50 border-t px-4 py-2">
+            <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 text-center">
+              <p class="text-xs text-muted-foreground m-0">
+                Powered by AI Elements Vue • Built with Tauri + Vue 3
+              </p>
+            </div>
+          </footer>
         </SidebarInset>
       </div>
 
@@ -947,6 +1516,54 @@
           <DialogFooter>
             <Button variant="outline" @click="newChatDialogOpen = false">Cancel</Button>
             <Button @click="createNewConversation">Create Chat</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <!-- Settings Dialog -->
+      <Dialog v-model:open="settingsDialogOpen">
+        <DialogContent class="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Application Settings</DialogTitle>
+            <DialogDescription>Manage your application preferences and settings.</DialogDescription>
+          </DialogHeader>
+          <div class="grid gap-4 py-4">
+            <div class="grid grid-cols-4 items-center gap-4">
+              <h4 class="col-span-4 text-md font-semibold mt-2">General</h4>
+              <label for="username" class="text-right">User Name</label>
+              <Input id="username" :model-value="user.name" class="col-span-3" />
+            </div>
+            <div class="grid grid-cols-4 items-center gap-4">
+              <h4 class="col-span-4 text-md font-semibold mt-2">AI Model Settings</h4>
+              <label for="default-model" class="text-right">Default Model</label>
+              <Select v-model="selectedModel">
+                <SelectTrigger class="col-span-3">
+                  <SelectValue placeholder="Choose a default model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="model in modelOptions" :key="model.id" :value="model.id">
+                    <div class="flex items-center gap-3">
+                      <component :is="model.icon" :class="`w-5 h-5 ${model.color}`" />
+                      <div>
+                        <div class="font-medium">{{ model.name }}</div>
+                        <div class="text-sm text-muted-foreground">{{ model.description }}</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div class="grid grid-cols-4 items-center gap-4">
+              <h4 class="col-span-4 text-md font-semibold mt-2">Theme</h4>
+              <label for="theme" class="text-right">Dark Mode</label>
+              <div class="col-span-3 flex items-center justify-start">
+                <input type="checkbox" v-model="darkMode" id="theme" class="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" @click="settingsDialogOpen = false">Close</Button>
+            <Button @click="settingsDialogOpen = false">Save changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

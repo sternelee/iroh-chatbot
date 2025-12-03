@@ -3,14 +3,14 @@ import path from 'node:path'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
-const host = process.env.TAURI_DEV_HOST
+const host = typeof process !== 'undefined' ? process.env.TAURI_DEV_HOST : undefined
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(typeof __dirname !== 'undefined' ? __dirname : '.', './src'),
     },
   },
 

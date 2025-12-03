@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { computed, useAttrs } from 'vue'
+  import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+  import { computed, useAttrs } from 'vue'
 
-interface Props {
-  src: string
-  name?: string
-  class?: string
-}
+  interface Props {
+    src: string
+    name?: string
+    class?: string
+  }
 
-const props = defineProps<Props>()
-const attrs = useAttrs()
+  const props = defineProps<Props>()
+  const attrs = useAttrs()
 
-const fallbackText = computed(() => props.name?.slice(0, 2) ?? 'ME')
+  const fallbackText = computed(() => props.name?.slice(0, 2) ?? 'ME')
 </script>
 
 <template>

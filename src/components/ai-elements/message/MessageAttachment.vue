@@ -1,40 +1,33 @@
 <script setup lang="ts">
-import type { FileUIPart } from 'ai'
-import type { HTMLAttributes } from 'vue'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
-import { PaperclipIcon, XIcon } from 'lucide-vue-next'
-import { computed } from 'vue'
+  import type { FileUIPart } from 'ai'
+  import type { HTMLAttributes } from 'vue'
+  import { Button } from '@/components/ui/button'
+  import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+  import { cn } from '@/lib/utils'
+  import { PaperclipIcon, XIcon } from 'lucide-vue-next'
+  import { computed } from 'vue'
 
-interface Props {
-  data: FileUIPart
-  class?: HTMLAttributes['class']
-}
-const props = defineProps<Props>()
+  interface Props {
+    data: FileUIPart
+    class?: HTMLAttributes['class']
+  }
+  const props = defineProps<Props>()
 
-const emits = defineEmits<{
-  (e: 'remove'): void
-}>()
+  const emits = defineEmits<{
+    (e: 'remove'): void
+  }>()
 
-const filename = computed(() => props.data.filename || '')
-const mediaType = computed(() =>
-  props.data.mediaType?.startsWith('image/') && props.data.url ? 'image' : 'file',
-)
-const isImage = computed(() => mediaType.value === 'image')
-const attachmentLabel = computed(() =>
-  filename.value || (isImage.value ? 'Image' : 'Attachment'),
-)
+  const filename = computed(() => props.data.filename || '')
+  const mediaType = computed(() =>
+    props.data.mediaType?.startsWith('image/') && props.data.url ? 'image' : 'file'
+  )
+  const isImage = computed(() => mediaType.value === 'image')
+  const attachmentLabel = computed(() => filename.value || (isImage.value ? 'Image' : 'Attachment'))
 </script>
 
 <template>
   <div
-    :class="
-      cn(
-        'group relative size-24 overflow-hidden rounded-lg',
-        props.class,
-      )
-    "
+    :class="cn('group relative size-24 overflow-hidden rounded-lg', props.class)"
     v-bind="$attrs"
   >
     <template v-if="isImage">
@@ -44,7 +37,7 @@ const attachmentLabel = computed(() =>
         class="size-full object-cover"
         height="100"
         width="100"
-      >
+      />
       <Button
         aria-label="Remove attachment"
         class="absolute top-2 right-2 size-6 rounded-full bg-background/80 p-0 opacity-0 backdrop-blur-sm transition-opacity hover:bg-background group-hover:opacity-100 [&>svg]:size-3"

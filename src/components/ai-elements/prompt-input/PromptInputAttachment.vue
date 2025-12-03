@@ -1,52 +1,45 @@
 <script setup lang="ts">
-import type { AttachmentFile } from './types'
-import { Button } from '@/components/ui/button'
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card'
-import { cn } from '@/lib/utils'
-import { PaperclipIcon, XIcon } from 'lucide-vue-next'
-import { computed } from 'vue'
-import { usePromptInput } from './context'
+  import type { AttachmentFile } from './types'
+  import { Button } from '@/components/ui/button'
+  import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
+  import { cn } from '@/lib/utils'
+  import { PaperclipIcon, XIcon } from 'lucide-vue-next'
+  import { computed } from 'vue'
+  import { usePromptInput } from './context'
 
-const props = defineProps<{
-  file: AttachmentFile
-  class?: string
-}>()
+  const props = defineProps<{
+    file: AttachmentFile
+    class?: string
+  }>()
 
-const { removeFile } = usePromptInput()
+  const { removeFile } = usePromptInput()
 
-const filename = computed(() => props.file.filename || '')
-const isImage = computed(() =>
-  props.file.mediaType?.startsWith('image/') && props.file.url,
-)
-const label = computed(() => filename.value || (isImage.value ? 'Image' : 'Attachment'))
+  const filename = computed(() => props.file.filename || '')
+  const isImage = computed(() => props.file.mediaType?.startsWith('image/') && props.file.url)
+  const label = computed(() => filename.value || (isImage.value ? 'Image' : 'Attachment'))
 
-function handleRemove(e: Event) {
-  e.stopPropagation()
-  removeFile(props.file.id)
-}
+  function handleRemove(e: Event) {
+    e.stopPropagation()
+    removeFile(props.file.id)
+  }
 </script>
 
 <template>
   <HoverCard :open-delay="0" :close-delay="0">
     <HoverCardTrigger as-child>
       <div
-        :class="cn(
-          'group relative flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
-          props.class,
-        )"
+        :class="
+          cn(
+            'group relative flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+            props.class
+          )
+        "
       >
         <div class="relative size-5 shrink-0">
-          <div class="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
-            <img
-              v-if="isImage"
-              :src="file.url"
-              :alt="label"
-              class="size-5 object-cover"
-            >
+          <div
+            class="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0"
+          >
+            <img v-if="isImage" :src="file.url" :alt="label" class="size-5 object-cover" />
             <div v-else class="flex size-5 items-center justify-center text-muted-foreground">
               <PaperclipIcon class="size-3" />
             </div>
@@ -70,12 +63,11 @@ function handleRemove(e: Event) {
 
     <HoverCardContent class="w-auto p-2" align="start">
       <div class="w-auto space-y-3">
-        <div v-if="isImage" class="flex max-h-96 w-96 items-center justify-center overflow-hidden rounded-md border">
-          <img
-            :src="file.url"
-            :alt="label"
-            class="max-h-full max-w-full object-contain"
-          >
+        <div
+          v-if="isImage"
+          class="flex max-h-96 w-96 items-center justify-center overflow-hidden rounded-md border"
+        >
+          <img :src="file.url" :alt="label" class="max-h-full max-w-full object-contain" />
         </div>
         <div class="flex items-center gap-2.5">
           <div class="min-w-0 flex-1 space-y-1 px-0.5">

@@ -4,6 +4,7 @@ import typescriptParser from '@typescript-eslint/parser'
 import vue from 'eslint-plugin-vue'
 import prettier from 'eslint-plugin-prettier'
 import prettierConfig from 'eslint-config-prettier'
+import vueParser from 'vue-eslint-parser'
 
 export default [
   // 全局忽略配置
@@ -54,7 +55,7 @@ export default [
   {
     files: ['**/*.vue'],
     languageOptions: {
-      parser: vue.parser,
+      parser: vueParser,
       parserOptions: {
         parser: typescriptParser,
         ecmaVersion: 'latest',
@@ -66,12 +67,35 @@ export default [
         defineEmits: 'readonly',
         defineExpose: 'readonly',
         withDefaults: 'readonly',
+        document: 'readonly',
+        window: 'readonly',
+        navigator: 'readonly',
+        KeyboardEvent: 'readonly',
+        MouseEvent: 'readonly',
+        Event: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLFormElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        File: 'readonly',
+        FileList: 'readonly',
+        FileReader: 'readonly',
+        DragEvent: 'readonly',
+        ClipboardEvent: 'readonly',
+        EventTarget: 'readonly',
+        URL: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        console: 'readonly',
+        alert: 'readonly',
+        prompt: 'readonly',
+        confirm: 'readonly',
       },
     },
     plugins: {
       vue: vue,
     },
-    processor: vue.processors['.vue'],
     rules: {
       // Vue 基础规则
       'vue/multi-word-component-names': 'off',
@@ -87,6 +111,33 @@ export default [
   // JavaScript/TypeScript 文件的额外规则
   {
     files: ['**/*.{js,ts,tsx}'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+        document: 'readonly',
+        window: 'readonly',
+        navigator: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLFormElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        File: 'readonly',
+        FileList: 'readonly',
+        FileReader: 'readonly',
+        DragEvent: 'readonly',
+        ClipboardEvent: 'readonly',
+        EventTarget: 'readonly',
+        URL: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        alert: 'readonly',
+        prompt: 'readonly',
+        confirm: 'readonly',
+      },
+    },
     rules: {
       // 通用规则
       'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
