@@ -31,7 +31,8 @@
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.17",
     "vue": "^3.5.13",
-    "vue-stick-to-bottom": "^0.1.0"
+    "vue-stick-to-bottom": "^0.1.0",
+    "vueuc": "^0.4.65"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
