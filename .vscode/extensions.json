@@ -1,7 +1,43 @@
 {
   "recommendations": [
+    // Vue 开发
     "Vue.volar",
+    "Vue.vscode-typescript-vue-plugin",
+
+    // Tauri 和 Rust 支持
     "tauri-apps.tauri-vscode",
-    "rust-lang.rust-analyzer"
+    "rust-lang.rust-analyzer",
+
+    // TypeScript 支持
+    "ms-vscode.vscode-typescript-next",
+
+    // Tailwind CSS 支持
+    "bradlc.vscode-tailwindcss",
+
+    // 代码格式化和检查
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "stylelint.vscode-stylelint",
+
+    // 代码增强
+    "formulahendry.auto-rename-tag",
+    "christian-kohler.path-intellisense",
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+
+    // Git 支持
+    "eamodio.gitlens",
+
+    // 主题和图标
+    "PKief.material-icon-theme",
+    "zhuangtongfa.material-theme",
+
+    // 实用工具
+    "streetsidesoftware.code-spell-checker",
+    "gruntfuggly.todo-tree",
+
+    // 高亮和括号
+    "CoenraadS.bracket-pair-colorizer-2",
+    "vscode-icons-team.vscode-icons"
   ]
 }

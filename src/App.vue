@@ -1,160 +1,213 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+  ConversationEmptyState,
+} from '@/components/ai-elements/conversation'
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from '@/components/ai-elements/message'
+import {
+  PromptInput,
+  PromptInputSubmit,
+  PromptInputTextarea,
+} from '@/components/ai-elements/prompt-input'
+import { Bot } from 'lucide-vue-next'
 
-const greetMsg = ref("");
-const name = ref("");
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
+}
 
-async function greet() {
-  // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  greetMsg.value = await invoke("greet", { name: name.value });
+const input = ref('')
+const messages = ref<ChatMessage[]>([])
+const status = ref<'idle' | 'loading' | 'error'>('idle')
+const error = ref<string | null>(null)
+
+async function handleSubmit(e: Event) {
+  e.preventDefault()
+  if (!input.value.trim() || status.value === 'loading') return
+
+  const userMessage = input.value.trim()
+  input.value = ''
+
+  // Add user message
+  messages.value.push({
+    id: Date.now().toString(),
+    role: 'user',
+    content: userMessage,
+    timestamp: new Date()
+  })
+
+  // Set loading state
+  status.value = 'loading'
+  error.value = null
+
+  try {
+    // Simulate bot response (replace with actual API call)
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    const botResponse = getBotResponse(userMessage)
+    messages.value.push({
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: botResponse,
+      timestamp: new Date()
+    })
+
+    status.value = 'idle'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'An error occurred'
+    status.value = 'error'
+  }
+}
+
+function getBotResponse(_userMessage: string): string {
+  const responses = [
+    "That's interesting! Tell me more about that.",
+    "I understand. How can I help you with that?",
+    "Thanks for sharing! What else would you like to discuss?",
+    "I see your point. Let me think about that for a moment.",
+    "That's a great question! Here's what I think about it.",
+    "I appreciate you sharing that with me.",
+    "That makes sense. What are your thoughts on this?",
+    "Interesting perspective! Have you considered other angles?",
+  ]
+  return responses[Math.floor(Math.random() * responses.length)]
 }
 </script>
 
 <template>
-  <main class="container">
-    <h1>Welcome to Tauri + Vue</h1>
+  <div
+    class="flex flex-col h-screen font-sans bg-gradient-to-br from-indigo-500 to-purple-600"
+    :style="{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif' }"
+  >
+    <!-- Header -->
+    <header class="bg-white/95 backdrop-blur-lg border-b border-white/20 shadow-lg px-8 py-4">
+      <div class="max-w-screen-2xl mx-auto">
+        <div class="flex items-center gap-4">
+          <Bot class="w-10 h-10 text-indigo-500" />
+          <h1 class="text-3xl font-bold text-gray-900 m-0">Iroh Chat</h1>
+          <div
+            class="ml-auto flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+            :class="[
+              status !== 'error'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+            ]"
+          >
+            <span
+              class="w-2 h-2 rounded-full animate-pulse"
+              :class="[
+                status !== 'error' ? 'bg-green-500' : 'bg-red-500'
+              ]"
+            ></span>
+            <span>{{ status === 'error' ? 'Offline' : 'Online' }}</span>
+          </div>
+        </div>
+        <p class="text-gray-500 text-sm mt-1 ml-14">Your AI-powered chat assistant</p>
+      </div>
+    </header>
 
-    <div class="row">
-      <a href="https://vite.dev" target="_blank">
-        <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-      </a>
-      <a href="https://tauri.app" target="_blank">
-        <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-      </a>
-      <a href="https://vuejs.org/" target="_blank">
-        <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-      </a>
+    <!-- Chat Area -->
+    <div class="flex-1 overflow-hidden m-4 bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl">
+      <Conversation class="h-full">
+        <ConversationContent>
+          <ConversationEmptyState
+            v-if="messages.length === 0"
+            title="Start a conversation"
+            description="Type a message below to begin chatting with your AI assistant"
+          >
+            <Bot class="w-16 h-16 text-gray-400" />
+          </ConversationEmptyState>
+
+          <Message
+            v-for="message in messages"
+            :key="message.id"
+            :from="message.role"
+            class="max-w-[90%]"
+          >
+            <MessageContent>
+              <MessageResponse>
+                {{ message.content }}
+              </MessageResponse>
+            </MessageContent>
+          </Message>
+        </ConversationContent>
+
+        <ConversationScrollButton />
+      </Conversation>
     </div>
-    <p>Click on the Tauri, Vite, and Vue logos to learn more.</p>
 
-    <form class="row" @submit.prevent="greet">
-      <input id="greet-input" v-model="name" placeholder="Enter a name..." />
-      <button type="submit">Greet</button>
-    </form>
-    <p>{{ greetMsg }}</p>
-  </main>
+    <!-- Input Area -->
+    <div class="bg-white/95 backdrop-blur-lg border-t border-white/20 px-8 py-4">
+      <form @submit="handleSubmit" class="max-w-screen-2xl mx-auto">
+        <PromptInput class="relative bg-white rounded-2xl border-2 border-gray-200 transition-all focus-within:border-indigo-500 focus-within:shadow-lg focus-within:shadow-indigo-500/10">
+          <PromptInputTextarea
+            v-model="input"
+            placeholder="Type your message here..."
+            class="px-6 pr-16 py-4 border-0 resize-none text-base leading-6 max-h-32 focus:ring-0"
+            :disabled="status === 'loading'"
+            @keydown.enter.prevent="handleSubmit"
+          />
+
+          <PromptInputSubmit
+            :status="status === 'loading' ? 'streaming' : 'ready'"
+            :disabled="!input.trim() || status === 'loading'"
+            class="absolute bottom-3 right-3"
+            @click="handleSubmit"
+          />
+        </PromptInput>
+      </form>
+
+      <!-- Error Display -->
+      <div
+        v-if="error"
+        class="max-w-screen-2xl mx-auto mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+      >
+        <p class="m-0">Error: {{ error }}</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/95 backdrop-blur-lg border-t border-white/10 px-8 py-4">
+      <div class="max-w-screen-2xl mx-auto text-center">
+        <p class="text-gray-400 text-sm m-0">
+          Powered by AI Elements Vue • Built with Tauri + Vue 3
+        </p>
+      </div>
+    </footer>
+  </div>
 </template>
 
 <style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
-
+/* 移除自定义 CSS，全部使用 Tailwind CSS */
 </style>
 <style>
+/* 全局样式重置 - 利用 Tailwind 的基础层 */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 确保字体渲染优化 */
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 }
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
-
 </style>

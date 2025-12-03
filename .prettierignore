@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+.output/
+.nuxt/
+.vite/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Generated files
+*.d.ts
+auto-imports.d.ts
+components.d.ts
+
+# Config files
+tailwind.config.js
+vite.config.js
+tsconfig.json
+eslint.config.js
+
+# Documentation
+docs/
+*.md
