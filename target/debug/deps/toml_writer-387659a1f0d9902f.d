@@ -1,0 +1,10 @@
+/Users/sternelee/www/github/iroh-chat/target/debug/deps/toml_writer-387659a1f0d9902f.d: /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/lib.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/integer.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/key.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/string.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/value.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/write.rs
+
+/Users/sternelee/www/github/iroh-chat/target/debug/deps/libtoml_writer-387659a1f0d9902f.rmeta: /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/lib.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/integer.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/key.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/string.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/value.rs /Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/write.rs
+
+/Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/lib.rs:
+/Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/integer.rs:
+/Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/key.rs:
+/Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/string.rs:
+/Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/value.rs:
+/Users/sternelee/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/toml_writer-1.0.4/src/write.rs:
