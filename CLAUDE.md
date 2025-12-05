@@ -64,6 +64,27 @@ cd axum-app && cargo build
 cd axum-app && cargo run
 ```
 
+### Code Quality
+```bash
+# Lint and fix code
+npm run lint
+
+# Check linting without fixing
+npm run lint:check
+
+# Format code with Prettier
+npm run format
+
+# Check formatting
+npm run format:check
+
+# Run both linting and formatting
+npm run lint:format
+
+# Type check only
+npm run type-check
+```
+
 ## Key Configuration
 
 - **Vite config**: Port 1420, HMR on port 1421, ignores `src-tauri/` for watching
@@ -78,12 +99,86 @@ The project uses:
 - **Rust**: Cargo workspace with members `axum-app` and `src-tauri`
 - **IDE**: Recommended VS Code with Vue - Official, Tauri, and rust-analyzer extensions
 
+## Application Features
+
+### Core Chat Interface
+- **AI Chat Interface**: Full-featured chat with conversation management, message history, and real-time responses
+- **Multiple AI Models**: Support for GPT-4, GPT-3.5 Turbo, Claude 3, and other models with model-specific badges
+- **Message Enhancements**: Like/dislike feedback, copy functionality, response regeneration, and message branching
+- **File Attachments**: Support for file uploads and attachments in conversations
+
+### User Interface
+- **Sidebar Navigation**: Collapsible sidebar with conversation list, search functionality, and settings
+- **Responsive Design**: Mobile-friendly interface with collapsible sidebars and adaptive layouts
+- **Dark/Light Mode**: Theme switching with persistent settings
+- **Advanced Components**: Uses shadcn/ui components including Cards, Badges, Tabs, Accordion, Switch, and ScrollArea
+
+### Input System
+- **Cursor-Style Input**: Advanced prompt input with file attachment support, command palette, and tabs
+- **Suggestion Cards**: Interactive suggestion cards for common use cases (code writing, explanations, brainstorming)
+- **Model Selection**: Dynamic model switching with detailed model information and capabilities
+
+### Settings & Configuration
+- **Comprehensive Settings**: Tabbed settings interface with General, AI Models, and Appearance sections
+- **User Profile**: Customizable user profile with avatar, name, and email
+- **Preferences**: Notification settings, sound effects, auto-save conversations
+
 ## Component Structure
 
-Frontend components follow shadcn/ui patterns with:
-- **Components**: `@/components` (including `@/components/ui`)
-- **Utilities**: `@/lib/utils.ts` with `cn()` function for class merging
-- **Composables**: `@/composables` for Vue composition functions
-- **Assets**: Static assets in `src/assets/`
+Frontend components follow a sophisticated architecture:
 
-The application currently contains a basic Vue template with Tauri integration for demonstrating the framework setup.
+### Core Components (`@/components/`)
+- **AI Elements**: Advanced chat components (`@/components/ai-elements/`)
+  - `conversation/`: Conversation management, content display, scroll controls
+  - `message/`: Message rendering, actions, attachments, branching, toolbar
+  - `prompt-input/`: Advanced input system with file handling, commands, tabs
+- **UI Components**: Extensive shadcn/ui component library (`@/components/ui/`)
+  - Standard components: Button, Input, Avatar, Dialog, Dropdown Menu, Tooltip
+  - Advanced components: Sidebar, Card, Badge, Tabs, Accordion, Switch, ScrollArea
+
+### Key Architectural Patterns
+- **AI SDK Compatibility**: Message structures compatible with AI SDK standards
+- **Composition API**: Extensive use of Vue 3 Composition API with TypeScript
+- **Reactive State Management**: Complex reactive state for conversations, messages, and UI
+- **Component Composition**: Highly composable component architecture with props and events
+
+### API Integration
+- **Mock Chat API**: `src/api/chat.ts` with POST endpoint for AI responses
+- **Response Simulation**: Realistic response timing and content variation
+- **Error Handling**: Comprehensive error handling and user feedback
+
+## Data Structures
+
+### Core Types
+- **ChatMessage**: AI SDK compatible message structure with id, role, content, createdAt, attachments, metadata
+- **ConversationData**: Complete conversation structure with messages array, timestamps, model info
+- **EnhancedMessage**: Advanced message format with versioning, attachments, and branching support
+- **PromptInputMessage**: Input format for the advanced prompt system with text and files
+
+### State Management
+- **Conversations**: Reactive array of conversation data with search and filtering
+- **Messages**: Separate reactive arrays for current messages and enhanced messages
+- **UI State**: Reactive state for dark mode, loading status, error handling, settings
+- **User Preferences**: Settings for notifications, sound effects, auto-save, theme selection
+
+## Development Patterns
+
+### Vue 3 Patterns
+- **Composition API**: All components use `<script setup>` with TypeScript
+- **Reactive References**: Extensive use of `ref()` and `computed()` for state management
+- **Watchers**: Strategic use of `watch()` for side effects and auto-scrolling
+- **Component Composition**: Heavy use of props, events, and slots for component communication
+
+### Styling Approach
+- **Tailwind CSS**: Comprehensive utility-first styling with custom configurations
+- **shadcn/ui**: Professional component library with consistent design system
+- **Responsive Design**: Mobile-first approach with breakpoint-specific layouts
+- **Theme Support**: Dynamic dark/light mode with CSS custom properties
+
+### TypeScript Usage
+- **Strict Mode**: Full TypeScript strict mode with comprehensive type checking
+- **Interface Definitions**: Detailed interfaces for all data structures and API responses
+- **Type Safety**: Strong typing throughout with proper generic usage
+- **Import Aliases**: Path aliases (`@/`) for clean import statements
+
+The application is a production-ready AI chat interface with advanced features comparable to modern AI chat platforms.
