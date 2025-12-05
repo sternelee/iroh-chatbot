@@ -4,7 +4,6 @@
     Conversation,
     ConversationContent,
     ConversationScrollButton,
-    ConversationEmptyState,
   } from '@/components/ai-elements/conversation'
   import {
     Message,
@@ -12,7 +11,6 @@
     MessageActions,
     MessageAttachment,
     MessageAttachments,
-    MessageAvatar,
     MessageBranch,
     MessageBranchContent,
     MessageBranchNext,
@@ -97,6 +95,18 @@
     SidebarTrigger,
     useSidebar,
   } from '@/components/ui/sidebar'
+  // New shadcn-vue components
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+  import { Badge } from '@/components/ui/badge'
+  import { ScrollArea } from '@/components/ui/scroll-area'
+  import { Switch } from '@/components/ui/switch'
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+  import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+  } from '@/components/ui/accordion'
   import {
     Bot,
     Plus,
@@ -112,9 +122,6 @@
     Settings,
     Moon,
     Sun,
-    Paperclip,
-    Mic,
-    Square,
     ChevronRight,
     History,
     LogOut,
@@ -126,6 +133,11 @@
     Check,
     ThumbsUp,
     ThumbsDown,
+    Code,
+    Lightbulb,
+    Zap,
+    BookOpen,
+    PenTool,
   } from 'lucide-vue-next'
   import type { PromptInputMessage } from '@/components/ai-elements/prompt-input'
 
@@ -157,7 +169,7 @@
     conversationId: string
   }
 
-  interface Conversation {
+  interface ConversationData {
     id: string
     title: string
     lastMessage: string
@@ -169,9 +181,8 @@
   const input = ref('')
   const messages = ref<ChatMessage[]>([])
   const enhancedMessages = ref<EnhancedMessage[]>([])
-  const conversations = ref<Conversation[]>([])
+  const conversations = ref<ConversationData[]>([])
   const currentConversationId = ref<string>('')
-  const _sidebarOpen = ref(false)
   const searchQuery = ref('')
   const status = ref<'idle' | 'loading' | 'error'>('idle')
   const error = ref<string | null>(null)
@@ -180,19 +191,21 @@
   const messagesContainer = ref<HTMLElement>()
   const autoScrollEnabled = ref(true)
   const darkMode = ref(false)
-  const isRecording = ref(false)
-  const attachments = ref<File[]>([])
   const settingsDialogOpen = ref(false)
+
+  // Settings state
+  const settingsTab = ref('general')
+  const enableNotifications = ref(true)
+  const enableSoundEffects = ref(false)
+  const autoSaveConversations = ref(true)
 
   // Enhanced message features
   const liked = ref<Record<string, boolean>>({})
   const disliked = ref<Record<string, boolean>>({})
 
   // Cursor-style state
-  const modelSelectorOpen = ref(false)
+  // eslint-disable-next-line no-undef
   const textareaRef = ref<HTMLTextAreaElement | null>(null)
-
-  const selectedModelData = computed(() => models.find((m) => m.id === selectedModel.value))
 
   const user = ref({
     email: 'user@example.com',
@@ -214,45 +227,6 @@
       ></div>
     `,
   })
-
-  // Cursor-style model definitions
-  const models = [
-    {
-      id: 'gpt-4o',
-      name: 'GPT-4o',
-      chef: 'OpenAI',
-      chefSlug: 'openai',
-      providers: ['openai', 'azure'],
-    },
-    {
-      id: 'gpt-4o-mini',
-      name: 'GPT-4o Mini',
-      chef: 'OpenAI',
-      chefSlug: 'openai',
-      providers: ['openai', 'azure'],
-    },
-    {
-      id: 'claude-opus-4-20250514',
-      name: 'Claude 4 Opus',
-      chef: 'Anthropic',
-      chefSlug: 'anthropic',
-      providers: ['anthropic', 'azure', 'google', 'amazon-bedrock'],
-    },
-    {
-      id: 'claude-sonnet-4-20250514',
-      name: 'Claude 4 Sonnet',
-      chef: 'Anthropic',
-      chefSlug: 'anthropic',
-      providers: ['anthropic', 'azure', 'google', 'amazon-bedrock'],
-    },
-    {
-      id: 'gemini-2.0-flash-exp',
-      name: 'Gemini 2.0 Flash',
-      chef: 'Google',
-      chefSlug: 'google',
-      providers: ['google'],
-    },
-  ]
 
   // Constants for Cursor-style behavior
   const SUBMITTING_TIMEOUT = 200
@@ -315,6 +289,62 @@
     },
   ]
 
+  // Suggestion cards for empty state
+  const suggestionCards = [
+    {
+      id: 'code',
+      title: 'Write Code',
+      description: 'Help me write a function or debug code',
+      icon: Code,
+      prompt: 'Help me write a function that...',
+      color: 'text-blue-500',
+    },
+    {
+      id: 'explain',
+      title: 'Explain Concepts',
+      description: 'Learn about programming concepts',
+      icon: BookOpen,
+      prompt: 'Explain the concept of...',
+      color: 'text-green-500',
+    },
+    {
+      id: 'brainstorm',
+      title: 'Brainstorm Ideas',
+      description: 'Generate creative ideas and solutions',
+      icon: Lightbulb,
+      prompt: 'Help me brainstorm ideas for...',
+      color: 'text-yellow-500',
+    },
+    {
+      id: 'improve',
+      title: 'Improve Writing',
+      description: 'Polish and enhance your text',
+      icon: PenTool,
+      prompt: 'Help me improve this text:',
+      color: 'text-purple-500',
+    },
+  ]
+
+  // Format timestamp for display
+  function formatTimestamp(date: Date): string {
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+
+    if (diff < 60000) return 'Just now'
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+    return date.toLocaleDateString()
+  }
+
+  // Get model badge color
+  function getModelBadgeVariant(
+    modelId: string
+  ): 'default' | 'secondary' | 'destructive' | 'outline' {
+    if (modelId.includes('gpt-4')) return 'default'
+    if (modelId.includes('claude')) return 'secondary'
+    return 'outline'
+  }
+
   // Filter conversations based on search
   const filteredConversations = computed(() => {
     if (!searchQuery.value) return conversations.value
@@ -347,7 +377,7 @@
     const now = new Date()
 
     // Create first conversation
-    const conv1: Conversation = {
+    const conv1: ConversationData = {
       id: '1',
       title: 'Vue 3 Composition API Guide',
       lastMessage: 'The Vue Composition API is a powerful feature...',
@@ -357,7 +387,7 @@
     }
 
     // Add another sample conversation
-    const conv2: Conversation = {
+    const conv2: ConversationData = {
       id: '2',
       title: 'Frontend Development Discussion',
       lastMessage: "I'd be happy to help with that feature...",
@@ -518,6 +548,7 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
           conversationId: '1',
         },
       ]
+      // Keep demo enhanced messages for conversation 1
     } else if (conversationId === '2') {
       messages.value = [
         {
@@ -536,8 +567,12 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
           conversationId: '2',
         },
       ]
+      // Clear enhanced messages for conversation 2
+      enhancedMessages.value = []
     } else {
       messages.value = []
+      // Clear enhanced messages for new conversations
+      enhancedMessages.value = []
     }
 
     input.value = ''
@@ -548,7 +583,7 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
   // Create a new conversation
   function createNewConversation() {
     const newId = Date.now().toString()
-    const newConversation: Conversation = {
+    const newConversation: ConversationData = {
       id: newId,
       title: 'New Conversation',
       lastMessage: '',
@@ -560,6 +595,7 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
     conversations.value.unshift(newConversation)
     currentConversationId.value = newId
     messages.value = []
+    enhancedMessages.value = [] // Clear enhanced messages for new conversations
     input.value = ''
     newChatDialogOpen.value = false
 
@@ -587,73 +623,6 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
           createNewConversation()
         }
       }
-    }
-  }
-
-  // Format timestamp
-  function _formatTimestamp(date: Date): string {
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-
-    if (diff < 60000) return 'Just now'
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
-    return date.toLocaleDateString()
-  }
-
-  async function handleSubmit(e: Event) {
-    e.preventDefault()
-    if (!input.value.trim() || status.value === 'loading') return
-
-    const userMessage = input.value.trim()
-    input.value = ''
-
-    // Add user message
-    messages.value.push({
-      id: Date.now().toString(),
-      role: 'user',
-      content: userMessage,
-      timestamp: new Date(),
-      conversationId: currentConversationId.value,
-    })
-
-    // Update conversation info
-    const convIndex = conversations.value.findIndex(
-      (conv) => conv.id === currentConversationId.value
-    )
-    if (convIndex > -1) {
-      conversations.value[convIndex].lastMessage = userMessage
-      conversations.value[convIndex].timestamp = new Date()
-      conversations.value[convIndex].messageCount += 1
-    }
-
-    // Set loading state
-    status.value = 'loading'
-    error.value = null
-
-    try {
-      // Simulate bot response (replace with actual API call)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const botResponse = getBotResponse(userMessage)
-      messages.value.push({
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: botResponse,
-        timestamp: new Date(),
-        conversationId: currentConversationId.value,
-      })
-
-      // Update conversation with bot response
-      if (convIndex > -1) {
-        conversations.value[convIndex].lastMessage = botResponse
-        conversations.value[convIndex].timestamp = new Date()
-      }
-
-      status.value = 'idle'
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'An error occurred'
-      status.value = 'error'
     }
   }
 
@@ -755,26 +724,9 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
     alert('Share functionality coming soon!')
   }
 
-  function handleFileUpload(_event: Event) {
-    const files = (_event.target as HTMLInputElement).files
-    if (files) {
-      attachments.value = Array.from(files)
-    }
-  }
-
-  function toggleRecording() {
-    isRecording.value = !isRecording.value
-    // Implement recording logic
-  }
-
   function regenerateResponse() {
     // Implement response regeneration
     alert('Regenerate response functionality coming soon!')
-  }
-
-  function copyMessage(_messageId: string) {
-    // Legacy function - using enhanced version
-    alert('Copy message functionality coming soon!')
   }
 
   // Enhanced message functions
@@ -783,8 +735,8 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
   }
 
   function handleRetry() {
-    console.log('Retrying...')
     // Implement retry logic
+    regenerateResponse()
   }
 
   function toggleLike(key: string) {
@@ -819,39 +771,23 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
     return message.versions && message.versions.length > 1
   }
 
-  function handleBranchChange(index: number) {
-    console.log('Branch changed to:', index)
-  }
-
-  function startNewChat() {
-    createNewConversation()
-  }
-
-  function loadChat(_chatId: string) {
-    createNewConversation()
+  function handleBranchChange(_index: number) {
+    // Handle branch selection change
   }
 
   function toggleTheme() {
     darkMode.value = !darkMode.value
   }
 
-  function clearChat() {
-    if (currentConversationId.value) {
-      messages.value = []
-      const convIndex = conversations.value.findIndex((c) => c.id === currentConversationId.value)
-      if (convIndex > -1) {
-        conversations.value[convIndex].messageCount = 0
-        conversations.value[convIndex].lastMessage = ''
-      }
+  // Handle suggestion card click
+  function handleSuggestionClick(prompt: string) {
+    // Create a PromptInputMessage-like object and submit
+    const message: PromptInputMessage = {
+      text: prompt,
+      files: [],
     }
+    handleCursorSubmit(message)
   }
-
-  // Computed property for previous chats
-  const _previousChats = computed(() => {
-    return conversations.value.filter((conv) => conv.id !== currentConversationId.value)
-  })
-
-  const _isDark = computed(() => darkMode.value)
 
   // Initialize on mount
   if (typeof window !== 'undefined') {
@@ -924,10 +860,21 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
                     class="w-full justify-start text-left"
                   >
                     <History class="size-4" />
-                    <div class="flex-1">
-                      <div class="font-medium">{{ conversation.title }}</div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium truncate">{{ conversation.title }}</span>
+                        <Badge
+                          :variant="getModelBadgeVariant(conversation.model)"
+                          class="text-[10px] px-1.5 py-0"
+                        >
+                          {{ conversation.model.split('-')[0] }}
+                        </Badge>
+                      </div>
                       <div class="text-xs text-muted-foreground truncate">
                         {{ conversation.lastMessage || 'No messages yet' }}
+                      </div>
+                      <div class="text-[10px] text-muted-foreground/70 mt-0.5">
+                        {{ formatTimestamp(conversation.timestamp) }}
                       </div>
                     </div>
                     <SidebarMenuBadge>
@@ -1120,26 +1067,91 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
           <div class="flex-1 overflow-hidden bg-muted/30">
             <div class="h-full flex flex-col">
               <!-- Messages Container -->
-              <div ref="messagesContainer" class="flex-1 overflow-y-auto" @scroll="handleScroll">
-                <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6">
+              <ScrollArea class="flex-1" @scroll="handleScroll">
+                <div ref="messagesContainer" class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6">
                   <Conversation class="h-full">
                     <ConversationContent>
-                      <ConversationEmptyState
-                        v-if="messages.length === 0"
-                        title="Start a conversation"
-                        description="Type a message below to begin chatting with your AI assistant"
+                      <!-- Enhanced Empty State with Suggestion Cards -->
+                      <div
+                        v-if="enhancedMessages.length === 0"
+                        class="flex flex-col items-center justify-center py-12"
                       >
-                        <Avatar class="w-16 h-16 mb-4">
-                          <AvatarFallback>
-                            <Bot class="w-8 h-8 text-muted-foreground" />
+                        <Avatar class="w-20 h-20 mb-6">
+                          <AvatarFallback class="bg-gradient-to-br from-primary to-primary/60">
+                            <Bot class="w-10 h-10 text-primary-foreground" />
                           </AvatarFallback>
                         </Avatar>
-                        <h3 class="text-lg font-semibold mb-2">Hello! I'm your AI assistant</h3>
-                        <p class="text-muted-foreground text-center max-w-md">
-                          How can I help you today? Feel free to ask me anything, from coding
-                          questions to creative writing.
+                        <h2 class="text-2xl font-bold mb-2">Welcome to Iroh Chat</h2>
+                        <p class="text-muted-foreground text-center max-w-md mb-8">
+                          I'm your AI assistant powered by advanced language models. How can I help
+                          you today?
                         </p>
-                      </ConversationEmptyState>
+
+                        <!-- Suggestion Cards Grid -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+                          <Card
+                            v-for="suggestion in suggestionCards"
+                            :key="suggestion.id"
+                            class="cursor-pointer transition-all hover:shadow-md hover:border-primary/50 group"
+                            @click="handleSuggestionClick(suggestion.prompt)"
+                          >
+                            <CardHeader class="pb-2">
+                              <div class="flex items-center gap-3">
+                                <div
+                                  class="p-2 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors"
+                                >
+                                  <component
+                                    :is="suggestion.icon"
+                                    :class="['w-5 h-5', suggestion.color]"
+                                  />
+                                </div>
+                                <CardTitle class="text-base">{{ suggestion.title }}</CardTitle>
+                              </div>
+                            </CardHeader>
+                            <CardContent class="pt-0">
+                              <CardDescription>{{ suggestion.description }}</CardDescription>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        <!-- Quick Tips Accordion -->
+                        <div class="w-full max-w-2xl mt-8">
+                          <Accordion type="single" collapsible class="w-full">
+                            <AccordionItem value="tips">
+                              <AccordionTrigger>
+                                <div class="flex items-center gap-2">
+                                  <Zap class="w-4 h-4 text-yellow-500" />
+                                  <span>Pro Tips for Better Results</span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div class="space-y-3 text-sm text-muted-foreground">
+                                  <p>
+                                    •
+                                    <strong>Be specific:</strong>
+                                    The more context you provide, the better response you'll get.
+                                  </p>
+                                  <p>
+                                    •
+                                    <strong>Use examples:</strong>
+                                    Show what you're looking for with sample inputs or outputs.
+                                  </p>
+                                  <p>
+                                    •
+                                    <strong>Ask follow-ups:</strong>
+                                    Don't hesitate to ask for clarification or alternatives.
+                                  </p>
+                                  <p>
+                                    •
+                                    <strong>Try different models:</strong>
+                                    Each model has strengths - experiment to find what works best.
+                                  </p>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </div>
+                      </div>
 
                       <Message
                         v-for="message in enhancedMessages"
@@ -1285,7 +1297,7 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
                     <ConversationScrollButton />
                   </Conversation>
                 </div>
-              </div>
+              </ScrollArea>
             </div>
           </div>
 
@@ -1522,45 +1534,195 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
 
       <!-- Settings Dialog -->
       <Dialog v-model:open="settingsDialogOpen">
-        <DialogContent class="sm:max-w-lg">
+        <DialogContent class="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Application Settings</DialogTitle>
             <DialogDescription>Manage your application preferences and settings.</DialogDescription>
           </DialogHeader>
-          <div class="grid gap-4 py-4">
-            <div class="grid grid-cols-4 items-center gap-4">
-              <h4 class="col-span-4 text-md font-semibold mt-2">General</h4>
-              <label for="username" class="text-right">User Name</label>
-              <Input id="username" :model-value="user.name" class="col-span-3" />
-            </div>
-            <div class="grid grid-cols-4 items-center gap-4">
-              <h4 class="col-span-4 text-md font-semibold mt-2">AI Model Settings</h4>
-              <label for="default-model" class="text-right">Default Model</label>
-              <Select v-model="selectedModel">
-                <SelectTrigger class="col-span-3">
-                  <SelectValue placeholder="Choose a default model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="model in modelOptions" :key="model.id" :value="model.id">
+
+          <Tabs v-model="settingsTab" class="w-full">
+            <TabsList class="grid w-full grid-cols-3">
+              <TabsTrigger value="general">
+                <Settings class="w-4 h-4 mr-2" />
+                General
+              </TabsTrigger>
+              <TabsTrigger value="models">
+                <Brain class="w-4 h-4 mr-2" />
+                AI Models
+              </TabsTrigger>
+              <TabsTrigger value="appearance">
+                <Sun class="w-4 h-4 mr-2" />
+                Appearance
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="general" class="space-y-4 mt-4">
+              <Card>
+                <CardHeader class="pb-3">
+                  <CardTitle class="text-base">User Profile</CardTitle>
+                  <CardDescription>Manage your profile information</CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                  <div class="flex items-center gap-4">
+                    <Avatar class="h-16 w-16">
+                      <AvatarImage :src="user.avatar" />
+                      <AvatarFallback>{{ user.name.charAt(0) }}</AvatarFallback>
+                    </Avatar>
+                    <div class="flex-1 space-y-1">
+                      <label class="text-sm font-medium">Display Name</label>
+                      <Input v-model="user.name" placeholder="Your name" />
+                    </div>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-sm font-medium">Email</label>
+                    <Input v-model="user.email" placeholder="Your email" type="email" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader class="pb-3">
+                  <CardTitle class="text-base">Preferences</CardTitle>
+                  <CardDescription>Customize your experience</CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                      <label class="text-sm font-medium">Enable Notifications</label>
+                      <p class="text-xs text-muted-foreground">
+                        Receive notifications for new messages
+                      </p>
+                    </div>
+                    <Switch v-model:checked="enableNotifications" />
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                      <label class="text-sm font-medium">Sound Effects</label>
+                      <p class="text-xs text-muted-foreground">Play sounds for message events</p>
+                    </div>
+                    <Switch v-model:checked="enableSoundEffects" />
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <div class="space-y-0.5">
+                      <label class="text-sm font-medium">Auto-save Conversations</label>
+                      <p class="text-xs text-muted-foreground">
+                        Automatically save conversation history
+                      </p>
+                    </div>
+                    <Switch v-model:checked="autoSaveConversations" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="models" class="space-y-4 mt-4">
+              <Card>
+                <CardHeader class="pb-3">
+                  <CardTitle class="text-base">Default Model</CardTitle>
+                  <CardDescription>
+                    Select your preferred AI model for new conversations
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Select v-model="selectedModel">
+                    <SelectTrigger class="w-full">
+                      <SelectValue placeholder="Choose a default model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="model in modelOptions" :key="model.id" :value="model.id">
+                        <div class="flex items-center gap-3">
+                          <component :is="model.icon" :class="`w-5 h-5 ${model.color}`" />
+                          <div>
+                            <div class="font-medium">{{ model.name }}</div>
+                            <div class="text-xs text-muted-foreground">{{ model.description }}</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader class="pb-3">
+                  <CardTitle class="text-base">Available Models</CardTitle>
+                  <CardDescription>Learn about each AI model's capabilities</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Accordion type="single" collapsible class="w-full">
+                    <AccordionItem v-for="model in modelOptions" :key="model.id" :value="model.id">
+                      <AccordionTrigger>
+                        <div class="flex items-center gap-2">
+                          <component :is="model.icon" :class="`w-4 h-4 ${model.color}`" />
+                          <span>{{ model.name }}</span>
+                          <Badge v-if="selectedModel === model.id" variant="secondary" class="ml-2">
+                            Default
+                          </Badge>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <p class="text-sm text-muted-foreground">{{ model.description }}</p>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="appearance" class="space-y-4 mt-4">
+              <Card>
+                <CardHeader class="pb-3">
+                  <CardTitle class="text-base">Theme</CardTitle>
+                  <CardDescription>Customize the appearance of the application</CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                  <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                      <component :is="model.icon" :class="`w-5 h-5 ${model.color}`" />
-                      <div>
-                        <div class="font-medium">{{ model.name }}</div>
-                        <div class="text-sm text-muted-foreground">{{ model.description }}</div>
+                      <div class="p-2 rounded-lg bg-muted">
+                        <Moon v-if="darkMode" class="w-5 h-5" />
+                        <Sun v-else class="w-5 h-5" />
+                      </div>
+                      <div class="space-y-0.5">
+                        <label class="text-sm font-medium">Dark Mode</label>
+                        <p class="text-xs text-muted-foreground">
+                          {{
+                            darkMode ? 'Currently using dark theme' : 'Currently using light theme'
+                          }}
+                        </p>
                       </div>
                     </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div class="grid grid-cols-4 items-center gap-4">
-              <h4 class="col-span-4 text-md font-semibold mt-2">Theme</h4>
-              <label for="theme" class="text-right">Dark Mode</label>
-              <div class="col-span-3 flex items-center justify-start">
-                <input type="checkbox" v-model="darkMode" id="theme" class="h-4 w-4" />
-              </div>
-            </div>
-          </div>
+                    <Switch v-model:checked="darkMode" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader class="pb-3">
+                  <CardTitle class="text-base">Preview</CardTitle>
+                  <CardDescription>See how your theme looks</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    class="p-4 rounded-lg border"
+                    :class="darkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'"
+                  >
+                    <div class="flex items-center gap-2 mb-2">
+                      <Avatar class="h-8 w-8">
+                        <AvatarFallback>
+                          <Bot class="w-4 h-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <span class="font-medium">Sample Message</span>
+                    </div>
+                    <p class="text-sm opacity-80">
+                      This is how your messages will look with the selected theme.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
           <DialogFooter>
             <Button variant="outline" @click="settingsDialogOpen = false">Close</Button>
             <Button @click="settingsDialogOpen = false">Save changes</Button>
