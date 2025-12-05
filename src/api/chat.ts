@@ -9,9 +9,6 @@ export async function POST(request: globalThis.Request) {
       return new globalThis.Response('Invalid messages format', { status: 400 })
     }
 
-    // Get the last user message
-    const lastUserMessage = messages[messages.length - 1]
-
     // Simple bot responses
     const responses = [
       "That's interesting! Tell me more about that.",
