@@ -8,12 +8,14 @@ This is **iroh-chat**, a hybrid desktop application built with Tauri (Rust backe
 
 ## Architecture
 
-The project consists of three main components:
+The project uses an integrated hybrid architecture with three main components:
 
 ### 1. Tauri Desktop App (`src-tauri/`)
-- **Backend**: Rust library (`iroh_chat_lib`) in `src-tauri/src/`
+- **Backend**: Rust library (`iroh_chat_lib`) with embedded Axum server
 - **Frontend**: Vue 3 + TypeScript application in the root `src/`
+- **Integration**: Uses `tauri-axum` for seamless Tauri-Axum integration
 - **Entry point**: `src-tauri/src/main.rs` calls `iroh_chat_lib::run()`
+- **State Management**: Shared app state with async router handling via `Arc<Mutex<Router>>`
 
 ### 2. Vue Frontend (`src/`)
 - **Framework**: Vue 3 with Composition API and `<script setup>`
@@ -24,7 +26,8 @@ The project consists of three main components:
 ### 3. Axum Web Server (`axum-app/`)
 - **Framework**: Axum web framework for Rust
 - **Async runtime**: Tokio
-- **Structure**: Separate binary (`main.rs`) and library (`lib.rs`)
+- **Structure**: Library (`lib.rs`) used by Tauri, standalone binary (`main.rs`) for development
+- **Integration**: Exported as crate dependency to Tauri backend
 
 ## Common Development Commands
 
@@ -54,14 +57,20 @@ npm run tauri build
 
 ### Rust Components
 ```bash
-# Build Tauri backend
+# Build entire workspace (Tauri + Axum)
+cargo build
+
+# Build Tauri backend specifically
 cd src-tauri && cargo build
 
-# Build Axum app
+# Build Axum app specifically
 cd axum-app && cargo build
 
-# Run Axum server
+# Run standalone Axum server (for development/testing)
 cd axum-app && cargo run
+
+# Run integrated Tauri app with embedded Axum
+npm run tauri dev
 ```
 
 ### Code Quality
@@ -146,6 +155,27 @@ Frontend components follow a sophisticated architecture:
 - **Mock Chat API**: `src/api/chat.ts` with POST endpoint for AI responses
 - **Response Simulation**: Realistic response timing and content variation
 - **Error Handling**: Comprehensive error handling and user feedback
+
+## Tauri-Axum Integration
+
+### Architecture Pattern
+- **Shared Router**: Axum router is created in `axum-app/lib.rs` and embedded in Tauri app state
+- **Async Bridge**: Uses `tauri-axum` crate to bridge Tauri frontend to Axum backend
+- **Request Handling**: `local_app_request` command forwards frontend requests to embedded Axum router
+- **State Management**: `Arc<Mutex<Router>>` provides thread-safe access to the Axum router
+
+### Development Workflow
+- **Standalone Mode**: Run Axum server separately (`cd axum-app && cargo run`) for API development
+- **Integrated Mode**: Run Tauri app (`npm run tauri dev`) for full desktop experience
+- **Shared Code**: Axum routes and handlers are shared between standalone and integrated modes
+- **Hot Reload**: Both frontend (Vite) and backend (cargo watch) support hot reloading in development
+
+### Communication Flow
+1. Frontend (Vue) makes HTTP requests to local endpoints
+2. Tauri captures requests via `local_app_request` command
+3. Requests are forwarded to embedded Axum router
+4. Axum processes requests and returns responses
+5. Responses flow back through Tauri to the frontend
 
 ## Data Structures
 
