@@ -20,7 +20,7 @@
     :class="cn(props.class)"
     :default-value="defaultValue"
     :model-value="modelValue"
-    :orientation="orientation"
+    :orientation="orientation || 'horizontal'"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <slot />

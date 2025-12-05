@@ -25,7 +25,9 @@
     :default-value="defaultValue"
     :model-value="modelValue"
     :disabled="disabled"
-    @update:model-value="(v) => v && emit('update:modelValue', v)"
+    @update:model-value="
+      (v) => v !== undefined && v !== null && emit('update:modelValue', v)
+    "
   >
     <slot />
   </AccordionRoot>
