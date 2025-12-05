@@ -138,6 +138,8 @@
     Zap,
     BookOpen,
     PenTool,
+    PanelLeftClose,
+    PanelLeft,
   } from 'lucide-vue-next'
   import type { PromptInputMessage } from '@/components/ai-elements/prompt-input'
 
@@ -161,21 +163,25 @@
     attachments?: Attachment[]
   }
 
+  // AI SDK compatible message structure
   interface ChatMessage {
     id: string
-    role: 'user' | 'assistant'
+    role: 'user' | 'assistant' | 'system'
     content: string
-    timestamp: Date
-    conversationId: string
+    createdAt?: Date
+    attachments?: Attachment[]
+    metadata?: Record<string, unknown>
   }
 
+  // AI SDK compatible conversation structure
   interface ConversationData {
     id: string
     title: string
-    lastMessage: string
-    timestamp: Date
+    messages: ChatMessage[]
+    createdAt: Date
+    updatedAt: Date
     model: string
-    messageCount: number
+    metadata?: Record<string, unknown>
   }
 
   const input = ref('')
@@ -345,6 +351,18 @@
     return 'outline'
   }
 
+  // Get last message content from conversation
+  function getLastMessage(conv: ConversationData): string {
+    if (!conv.messages || conv.messages.length === 0) return 'No messages yet'
+    const lastMsg = conv.messages[conv.messages.length - 1]
+    return lastMsg.content.substring(0, 50) + (lastMsg.content.length > 50 ? '...' : '')
+  }
+
+  // Get message count from conversation
+  function getMessageCount(conv: ConversationData): number {
+    return conv.messages?.length || 0
+  }
+
   // Filter conversations based on search
   const filteredConversations = computed(() => {
     if (!searchQuery.value) return conversations.value
@@ -376,24 +394,50 @@
   function initializeConversations() {
     const now = new Date()
 
-    // Create first conversation
+    // Create first conversation with AI SDK compatible structure
     const conv1: ConversationData = {
       id: '1',
       title: 'Vue 3 Composition API Guide',
-      lastMessage: 'The Vue Composition API is a powerful feature...',
-      timestamp: now,
+      messages: [
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: 'How do Vue composition APIs work and when should I use them?',
+          createdAt: now,
+        },
+        {
+          id: 'msg-2',
+          role: 'assistant',
+          content: 'The Vue Composition API is a powerful feature...',
+          createdAt: now,
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
       model: 'gpt-3.5-turbo',
-      messageCount: 2,
     }
 
     // Add another sample conversation
     const conv2: ConversationData = {
       id: '2',
       title: 'Frontend Development Discussion',
-      lastMessage: "I'd be happy to help with that feature...",
-      timestamp: new Date(now.getTime() - 3600000), // 1 hour ago
+      messages: [
+        {
+          id: 'msg-3',
+          role: 'user',
+          content: 'Can you help me implement this new feature?',
+          createdAt: new Date(now.getTime() - 3600000),
+        },
+        {
+          id: 'msg-4',
+          role: 'assistant',
+          content: "I'd be happy to help with that feature...",
+          createdAt: new Date(now.getTime() - 3600000),
+        },
+      ],
+      createdAt: new Date(now.getTime() - 3600000),
+      updatedAt: new Date(now.getTime() - 3600000),
       model: 'gpt-4',
-      messageCount: 5,
     }
 
     conversations.value = [conv1, conv2]
@@ -544,8 +588,7 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
           id: '1-1',
           role: 'assistant',
           content: "Hello! I'm Iroh Chat, your AI assistant. How can I help you today?",
-          timestamp: new Date(),
-          conversationId: '1',
+          createdAt: new Date(),
         },
       ]
       // Keep demo enhanced messages for conversation 1
@@ -555,16 +598,14 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
           id: '2-1',
           role: 'user',
           content: 'Can you help me implement this new feature?',
-          timestamp: new Date(Date.now() - 300000),
-          conversationId: '2',
+          createdAt: new Date(Date.now() - 300000),
         },
         {
           id: '2-2',
           role: 'assistant',
           content:
             "I'd be happy to help you with that feature. Let me break it down into manageable steps and guide you through the implementation process.",
-          timestamp: new Date(Date.now() - 180000),
-          conversationId: '2',
+          createdAt: new Date(Date.now() - 180000),
         },
       ]
       // Clear enhanced messages for conversation 2
@@ -583,13 +624,14 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
   // Create a new conversation
   function createNewConversation() {
     const newId = Date.now().toString()
+    const now = new Date()
     const newConversation: ConversationData = {
       id: newId,
       title: 'New Conversation',
-      lastMessage: '',
-      timestamp: new Date(),
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
       model: selectedModel.value,
-      messageCount: 0,
     }
 
     conversations.value.unshift(newConversation)
@@ -637,24 +679,26 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
 
     // Convert to legacy format
     const userMessage = message.text || 'File uploaded'
+    const now = new Date()
 
-    // Add user message
-    messages.value.push({
+    // Create AI SDK compatible message
+    const newUserMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       content: userMessage,
-      timestamp: new Date(),
-      conversationId: currentConversationId.value,
-    })
+      createdAt: now,
+    }
 
-    // Update conversation info
+    // Add user message to messages array
+    messages.value.push(newUserMessage)
+
+    // Update conversation with new message
     const convIndex = conversations.value.findIndex(
       (conv) => conv.id === currentConversationId.value
     )
     if (convIndex > -1) {
-      conversations.value[convIndex].lastMessage = userMessage
-      conversations.value[convIndex].timestamp = new Date()
-      conversations.value[convIndex].messageCount += 1
+      conversations.value[convIndex].messages.push(newUserMessage)
+      conversations.value[convIndex].updatedAt = now
     }
 
     status.value = 'loading'
@@ -666,17 +710,20 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
 
     setTimeout(() => {
       const botResponse = getBotResponse(userMessage)
-      messages.value.push({
+      const responseTime = new Date()
+
+      const newBotMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: botResponse,
-        timestamp: new Date(),
-        conversationId: currentConversationId.value,
-      })
+        createdAt: responseTime,
+      }
+
+      messages.value.push(newBotMessage)
 
       if (convIndex > -1) {
-        conversations.value[convIndex].lastMessage = botResponse
-        conversations.value[convIndex].timestamp = new Date()
+        conversations.value[convIndex].messages.push(newBotMessage)
+        conversations.value[convIndex].updatedAt = responseTime
       }
 
       status.value = 'idle'
@@ -822,6 +869,19 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
                     <span class="text-xs text-sidebar-foreground">AI Assistant</span>
                   </div>
                 </SidebarMenuButton>
+                <!-- Sidebar collapse button -->
+                <SidebarTrigger class="ml-auto group-data-[collapsible=icon]:hidden">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button variant="ghost" size="icon" class="size-8">
+                        <PanelLeftClose class="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>Collapse sidebar</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </SidebarTrigger>
               </SidebarMenuItem>
             </SidebarMenu>
 
@@ -830,7 +890,7 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
             <SidebarInput
               placeholder="Search conversations..."
               v-model="searchQuery"
-              class="mt-2"
+              class="mt-2 group-data-[collapsible=icon]:hidden"
             />
           </SidebarHeader>
 
@@ -857,28 +917,30 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
                 >
                   <SidebarMenuButton
                     :is-active="currentConversationId === conversation.id"
-                    class="w-full justify-start text-left"
+                    class="w-full justify-start text-left h-auto py-2"
                   >
-                    <History class="size-4" />
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="font-medium truncate">{{ conversation.title }}</span>
+                    <History class="size-4 shrink-0" />
+                    <div class="flex-1 min-w-0 overflow-hidden">
+                      <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="font-medium text-sm truncate flex-1">{{
+                          conversation.title
+                        }}</span>
                         <Badge
                           :variant="getModelBadgeVariant(conversation.model)"
-                          class="text-[10px] px-1.5 py-0"
+                          class="text-[10px] px-1 py-0 shrink-0"
                         >
                           {{ conversation.model.split('-')[0] }}
                         </Badge>
                       </div>
                       <div class="text-xs text-muted-foreground truncate">
-                        {{ conversation.lastMessage || 'No messages yet' }}
+                        {{ getLastMessage(conversation) }}
                       </div>
                       <div class="text-[10px] text-muted-foreground/70 mt-0.5">
-                        {{ formatTimestamp(conversation.timestamp) }}
+                        {{ formatTimestamp(conversation.updatedAt) }}
                       </div>
                     </div>
-                    <SidebarMenuBadge>
-                      {{ conversation.messageCount }}
+                    <SidebarMenuBadge class="shrink-0">
+                      {{ getMessageCount(conversation) }}
                     </SidebarMenuBadge>
                   </SidebarMenuButton>
                   <DropdownMenu>
@@ -986,9 +1048,6 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
 
         <SidebarRail />
 
-        <!-- Mobile Menu Trigger -->
-        <SidebarTrigger class="lg:hidden fixed top-4 left-4 z-50" />
-
         <!-- Mobile Overlay -->
         <MobileOverlay />
 
@@ -999,6 +1058,25 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
             <div class="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16">
               <div class="flex items-center justify-between h-16">
                 <div class="flex items-center gap-3">
+                  <!-- Sidebar expand button (visible when sidebar is collapsed) -->
+                  <SidebarTrigger class="hidden lg:flex">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button variant="ghost" size="icon" class="size-8">
+                          <PanelLeft class="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>Toggle sidebar</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </SidebarTrigger>
+                  <!-- Mobile sidebar trigger -->
+                  <SidebarTrigger class="lg:hidden">
+                    <Button variant="ghost" size="icon" class="size-8">
+                      <PanelLeft class="size-4" />
+                    </Button>
+                  </SidebarTrigger>
                   <Avatar class="h-8 w-8">
                     <AvatarFallback>
                       <Bot class="w-4 h-4" />
