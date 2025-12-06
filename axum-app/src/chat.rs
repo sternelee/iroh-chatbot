@@ -722,6 +722,7 @@ mod tests {
             openai_service: None, // Force fallback mode for tests
             gemini_service: None,  // Force fallback mode for tests
             anthropic_service: None, // Force fallback mode for tests
+            database: None, // Force fallback mode for tests
         };
         Router::new()
             .route("/api/chat", post(super::legacy_chat_handler))

@@ -4,6 +4,7 @@ mod chat;
 mod openai_service;
 mod gemini_service;
 mod anthropic_service;
+mod database;
 
 use axum::{
     routing::{get, post},
@@ -14,8 +15,10 @@ use chat::{chat_completion, legacy_chat_handler};
 use openai_service::OpenAIService;
 use gemini_service::GeminiService;
 use anthropic_service::AnthropicService;
+use database::ChatDatabase;
 use std::sync::{Arc, Mutex};
 use todo::Todo;
+use dotenvy::dotenv;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -23,10 +26,14 @@ pub struct AppState {
     openai_service: Option<Arc<OpenAIService>>,
     gemini_service: Option<Arc<GeminiService>>,
     anthropic_service: Option<Arc<AnthropicService>>,
+    database: Option<Arc<ChatDatabase>>,
 }
 
-impl Default for AppState {
-    fn default() -> Self {
+impl AppState {
+    pub async fn new() -> Self {
+        // Load environment variables
+        let _ = dotenv();
+
         // Try to initialize OpenAI service from environment
         let openai_service = OpenAIService::from_env()
             .ok()
@@ -42,17 +49,27 @@ impl Default for AppState {
             .ok()
             .map(Arc::new);
 
+        // Try to initialize database from environment
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "file:./chat.db".to_string());
+
+        let database = ChatDatabase::new(&database_url)
+            .await
+            .ok()
+            .map(Arc::new);
+
         Self {
             todos: Arc::new(Mutex::new(Vec::new())),
             openai_service,
             gemini_service,
             anthropic_service,
+            database,
         }
     }
 }
 
-pub fn create_axum_app() -> Router {
-    let state = AppState::default();
+pub async fn create_axum_app() -> Router {
+    let state = AppState::new().await;
 
     Router::new()
         // Legacy Todo routes (keeping for backward compatibility)

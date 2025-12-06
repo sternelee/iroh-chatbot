@@ -30,7 +30,10 @@ base64 = "0.22.1"
 url = "2.5.7"
 # Anthropic Claude API dependencies
 sha2 = "0.10.8"
+# Database dependencies
+libsql = "0.6"
 
 [dev-dependencies]
 tower = "0.5.1"
 axum-test = "16.0.0"
+tempfile = "3.8.1"
