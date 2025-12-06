@@ -142,6 +142,7 @@
     PanelLeft,
   } from 'lucide-vue-next'
   import type { PromptInputMessage } from '@/components/ai-elements/prompt-input'
+  import { useChat } from '@ai-sdk/vue'
 
   interface Attachment {
     type: 'file'
@@ -184,14 +185,17 @@
     metadata?: Record<string, unknown>
   }
 
+  // Initialize ai-sdk/vue useChat - it will automatically use /api/chat endpoint
+  const { messages, handleSubmit, isLoading, error } = useChat({
+    api: '/api/chat',
+  })
+
   const input = ref('')
-  const messages = ref<ChatMessage[]>([])
   const enhancedMessages = ref<EnhancedMessage[]>([])
   const conversations = ref<ConversationData[]>([])
   const currentConversationId = ref<string>('')
   const searchQuery = ref('')
-  const status = ref<'idle' | 'loading' | 'error'>('idle')
-  const error = ref<string | null>(null)
+  const status = computed(() => isLoading.value ? 'loading' : (error.value ? 'error' : 'idle'))
   const selectedModel = ref('gpt-3.5-turbo')
   const newChatDialogOpen = ref(false)
   const messagesContainer = ref<HTMLElement>()
@@ -668,7 +672,7 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
     }
   }
 
-  // Cursor-style submit handler
+  // Cursor-style submit handler using ai-sdk/vue useChat
   function handleCursorSubmit(message: PromptInputMessage) {
     const hasText = !!message.text
     const hasAttachments = !!message.files?.length
@@ -677,57 +681,18 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
       return
     }
 
-    // Convert to legacy format
-    const userMessage = message.text || 'File uploaded'
-    const now = new Date()
+    // Use ai-sdk/vue handleSubmit - it will automatically POST to /api/chat
+    handleSubmit({
+      prompt: message.text || 'File uploaded',
+    })
 
-    // Create AI SDK compatible message
-    const newUserMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: userMessage,
-      createdAt: now,
+    // Add to enhanced messages for UI display
+    const newUserMessage: EnhancedMessage = {
+      key: Date.now().toString(),
+      from: 'user',
+      content: message.text || 'File uploaded',
     }
-
-    // Add user message to messages array
-    messages.value.push(newUserMessage)
-
-    // Update conversation with new message
-    const convIndex = conversations.value.findIndex(
-      (conv) => conv.id === currentConversationId.value
-    )
-    if (convIndex > -1) {
-      conversations.value[convIndex].messages.push(newUserMessage)
-      conversations.value[convIndex].updatedAt = now
-    }
-
-    status.value = 'loading'
-
-    // Simulate Cursor-style async behavior
-    setTimeout(() => {
-      status.value = 'loading'
-    }, SUBMITTING_TIMEOUT)
-
-    setTimeout(() => {
-      const botResponse = getBotResponse(userMessage)
-      const responseTime = new Date()
-
-      const newBotMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: botResponse,
-        createdAt: responseTime,
-      }
-
-      messages.value.push(newBotMessage)
-
-      if (convIndex > -1) {
-        conversations.value[convIndex].messages.push(newBotMessage)
-        conversations.value[convIndex].updatedAt = responseTime
-      }
-
-      status.value = 'idle'
-    }, STREAMING_TIMEOUT)
+    enhancedMessages.value.push(newUserMessage)
   }
 
   function getBotResponse(_userMessage: string): string {
