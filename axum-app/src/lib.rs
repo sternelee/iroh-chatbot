@@ -3,6 +3,7 @@ mod todo;
 mod chat;
 mod openai_service;
 mod gemini_service;
+mod anthropic_service;
 
 use axum::{
     routing::{get, post},
@@ -12,6 +13,7 @@ use routes::{create_todo, delete_todo, list_todos, toggle_todo};
 use chat::{chat_completion, legacy_chat_handler};
 use openai_service::OpenAIService;
 use gemini_service::GeminiService;
+use anthropic_service::AnthropicService;
 use std::sync::{Arc, Mutex};
 use todo::Todo;
 
@@ -20,6 +22,7 @@ pub struct AppState {
     todos: Arc<Mutex<Vec<Todo>>>,
     openai_service: Option<Arc<OpenAIService>>,
     gemini_service: Option<Arc<GeminiService>>,
+    anthropic_service: Option<Arc<AnthropicService>>,
 }
 
 impl Default for AppState {
@@ -34,10 +37,16 @@ impl Default for AppState {
             .ok()
             .map(Arc::new);
 
+        // Try to initialize Anthropic service from environment
+        let anthropic_service = AnthropicService::from_env()
+            .ok()
+            .map(Arc::new);
+
         Self {
             todos: Arc::new(Mutex::new(Vec::new())),
             openai_service,
             gemini_service,
+            anthropic_service,
         }
     }
 }

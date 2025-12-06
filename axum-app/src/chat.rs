@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::{AppState, GeminiService, OpenAIService};
+use crate::{AppState, GeminiService, OpenAIService, AnthropicService};
 
 /// Chat message structure compatible with AI SDK
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct ChatMessage {
     pub metadata: Option<HashMap<String, serde_json::Value>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ChatRole {
     User,
@@ -155,6 +155,8 @@ pub struct Usage {
 fn get_provider_from_model(model: &str) -> Provider {
     if model.starts_with("gemini") || model.starts_with("models/gemini") {
         Provider::Gemini
+    } else if model.starts_with("claude") {
+        Provider::Anthropic
     } else {
         Provider::OpenAI
     }
@@ -165,6 +167,7 @@ fn get_provider_from_model(model: &str) -> Provider {
 enum Provider {
     OpenAI,
     Gemini,
+    Anthropic,
 }
 
 /// Generate mock AI response
@@ -283,6 +286,9 @@ pub async fn chat_completion(
         }
         Provider::Gemini => {
             handle_gemini_request(state, request, &model).await
+        }
+        Provider::Anthropic => {
+            handle_anthropic_request(state, request, &model).await
         }
     }
 }
@@ -472,6 +478,96 @@ async fn handle_gemini_request(
     }
 }
 
+/// Handle Anthropic requests
+async fn handle_anthropic_request(
+    state: AppState,
+    request: ChatCompletionRequest,
+    model: &str,
+) -> Result<Response, StatusCode> {
+    // Check if Anthropic service is available
+    let anthropic_service = match &state.anthropic_service {
+        Some(service) => service,
+        None => {
+            // Fallback to mock response if Anthropic service is not configured
+            return handle_fallback_response(request).await;
+        }
+    };
+
+    // Check if streaming is requested
+    if request.stream.unwrap_or(false) {
+        // Streaming response
+        let anthropic_stream = anthropic_service
+            .chat_completion_stream(
+                request.messages,
+                Some(model.to_string()),
+                request.temperature,
+                request.max_tokens,
+            )
+            .await;
+
+        let sse_stream = stream! {
+            for await result in anthropic_stream {
+                match result {
+                    Ok(chunk) => {
+                        yield Ok::<Event, Box<dyn std::error::Error + Send + Sync>>(
+                            Event::default().json_data(chunk)
+                                .unwrap_or_else(|_| Event::default().data("serialization error"))
+                        );
+                    }
+                    Err(e) => {
+                        yield Ok::<Event, Box<dyn std::error::Error + Send + Sync>>(
+                            Event::default().data(format!("error: {}", e))
+                        );
+                    }
+                }
+            }
+        };
+
+        let sse_response = Sse::new(sse_stream)
+            .keep_alive(
+                axum::response::sse::KeepAlive::new()
+                    .interval(Duration::from_secs(15))
+                    .text("keep-alive-text"),
+            )
+            .into_response();
+
+        // Add AI SDK compatible headers
+        let mut response = sse_response;
+        let headers = response.headers_mut();
+        headers.insert("content-type", "text/event-stream".parse().unwrap());
+        headers.insert("cache-control", "no-cache".parse().unwrap());
+        headers.insert("connection", "keep-alive".parse().unwrap());
+        headers.insert("x-vercel-ai-ui-message-stream", "v1".parse().unwrap());
+        headers.insert("x-accel-buffering", "no".parse().unwrap());
+
+        Ok(response)
+    } else {
+        // Non-streaming response
+        match anthropic_service
+            .chat_completion(
+                request.messages,
+                Some(model.to_string()),
+                request.temperature,
+                request.max_tokens,
+            )
+            .await
+        {
+            Ok(response) => Ok(Json(response).into_response()),
+            Err(e) => {
+                // Return error response
+                let error_response = Json(serde_json::json!({
+                    "error": {
+                        "message": format!("Anthropic API error: {}", e),
+                        "type": "api_error",
+                        "code": "anthropic_error"
+                    }
+                }));
+                Ok((StatusCode::INTERNAL_SERVER_ERROR, error_response).into_response())
+            }
+        }
+    }
+}
+
 /// Fallback handler when OpenAI service is not available
 async fn handle_fallback_response(request: ChatCompletionRequest) -> Result<Response, StatusCode> {
     // Use mock response when OpenAI is not configured
@@ -625,6 +721,7 @@ mod tests {
             todos: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
             openai_service: None, // Force fallback mode for tests
             gemini_service: None,  // Force fallback mode for tests
+            anthropic_service: None, // Force fallback mode for tests
         };
         Router::new()
             .route("/api/chat", post(super::legacy_chat_handler))
@@ -756,6 +853,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_claude_model_routing() {
+        let app = create_test_app();
+
+        let request_body = json!({
+            "messages": [
+                {
+                    "id": "msg1",
+                    "role": "user",
+                    "content": "Hello Claude!"
+                }
+            ],
+            "model": "claude-3-5-sonnet-20241022",
+            "stream": false
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/v1/chat/completions")
+            .header("content-type", "application/json")
+            .body(Body::from(request_body.to_string()))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+
+        // Should return 200 even with fallback (Anthropic service not configured)
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn test_provider_detection() {
         // Test OpenAI model detection
         assert_eq!(get_provider_from_model("gpt-4"), Provider::OpenAI);
@@ -765,6 +891,11 @@ mod tests {
         assert_eq!(get_provider_from_model("gemini-1.5-flash"), Provider::Gemini);
         assert_eq!(get_provider_from_model("gemini-pro"), Provider::Gemini);
         assert_eq!(get_provider_from_model("models/gemini-1.5-pro"), Provider::Gemini);
+
+        // Test Anthropic model detection
+        assert_eq!(get_provider_from_model("claude-3-5-sonnet-20241022"), Provider::Anthropic);
+        assert_eq!(get_provider_from_model("claude-3-opus-20240229"), Provider::Anthropic);
+        assert_eq!(get_provider_from_model("claude-3-haiku-20240307"), Provider::Anthropic);
 
         // Test default to OpenAI
         assert_eq!(get_provider_from_model("unknown-model"), Provider::OpenAI);

@@ -7,8 +7,8 @@ This document describes the chat API endpoints available in the Axum backend, de
 The chat API provides multi-provider AI integration with intelligent fallback:
 
 1. **Legacy Chat API** (`/api/chat`) - Compatible with the existing frontend
-2. **Multi-Provider Chat API** (`/api/v1/chat/completions`) - Non-streaming (OpenAI & Gemini)
-3. **Multi-Provider Streaming Chat API** (`/api/v1/chat/completions`) - Server-Sent Events (OpenAI & Gemini)
+2. **Multi-Provider Chat API** (`/api/v1/chat/completions`) - Non-streaming (OpenAI, Gemini & Anthropic)
+3. **Multi-Provider Streaming Chat API** (`/api/v1/chat/completions`) - Server-Sent Events (OpenAI, Gemini & Anthropic)
 
 ## AI Provider Integration
 
@@ -16,6 +16,7 @@ The backend integrates with **multiple AI providers** based on the model name in
 
 - **OpenAI**: Models starting with `gpt-` (e.g., `gpt-4`, `gpt-3.5-turbo`)
 - **Google Gemini**: Models starting with `gemini-` (e.g., `gemini-1.5-flash`, `gemini-pro`)
+- **Anthropic Claude**: Models starting with `claude` (e.g., `claude-3-5-sonnet`, `claude-3-opus`)
 
 ### Environment Variables
 
@@ -29,6 +30,10 @@ OPENAI_DEFAULT_MODEL=gpt-3.5-turbo
 # Google Gemini API Configuration (Optional)
 GOOGLE_AI_API_KEY=your_google_ai_api_key_here
 GEMINI_MODEL=gemini-1.5-flash
+
+# Anthropic Claude API Configuration (Optional)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 ```
 
 ### Configuration File
@@ -43,6 +48,8 @@ cp .env.example .env
 OPENAI_API_KEY=sk-your-openai-api-key
 GOOGLE_AI_API_KEY=your_google_ai_api_key_here
 GEMINI_MODEL=gemini-1.5-flash
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 ```
 
 ### Fallback Behavior
@@ -67,6 +74,13 @@ GEMINI_MODEL=gemini-1.5-flash
 - `gemini-pro` - Previous generation
 - `gemini-pro-vision` - Multimodal
 
+**Anthropic Claude Models:**
+- `claude-3-5-sonnet-20241022` - Most capable
+- `claude-3-5-haiku-20241022` - Fast, cost-effective
+- `claude-3-opus-20240229` - Previous generation, most capable
+- `claude-3-sonnet-20240229` - Previous generation
+- `claude-3-haiku-20240307` - Previous generation, fast
+
 ### Automatic Provider Detection
 
 The system automatically routes requests based on the model name:
@@ -77,6 +91,9 @@ The system automatically routes requests based on the model name:
 
 // Routes to Gemini
 { model: "gemini-1.5-flash", messages: [...] }
+
+// Routes to Anthropic Claude
+{ model: "claude-3-5-sonnet-20241022", messages: [...] }
 
 // Default to OpenAI for unknown models
 { model: "unknown-model", messages: [...] }
