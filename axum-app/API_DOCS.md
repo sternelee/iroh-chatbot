@@ -4,29 +4,31 @@ This document describes the chat API endpoints available in the Axum backend, de
 
 ## Overview
 
-The chat API provides real OpenAI integration with intelligent fallback:
+The chat API provides multi-provider AI integration with intelligent fallback:
 
 1. **Legacy Chat API** (`/api/chat`) - Compatible with the existing frontend
-2. **OpenAI-Compatible Chat API** (`/api/v1/chat/completions`) - Non-streaming
-3. **OpenAI-Compatible Streaming Chat API** (`/api/v1/chat/completions`) - Server-Sent Events
+2. **Multi-Provider Chat API** (`/api/v1/chat/completions`) - Non-streaming (OpenAI & Gemini)
+3. **Multi-Provider Streaming Chat API** (`/api/v1/chat/completions`) - Server-Sent Events (OpenAI & Gemini)
 
-## OpenAI Integration
+## AI Provider Integration
 
-The backend integrates with **real OpenAI ChatGPT API** when configured:
+The backend integrates with **multiple AI providers** based on the model name in requests:
+
+- **OpenAI**: Models starting with `gpt-` (e.g., `gpt-4`, `gpt-3.5-turbo`)
+- **Google Gemini**: Models starting with `gemini-` (e.g., `gemini-1.5-flash`, `gemini-pro`)
 
 ### Environment Variables
 
-Set the following environment variables to enable OpenAI integration:
+Set the following environment variables to enable AI provider integration:
 
 ```bash
-# Required: Your OpenAI API key
+# OpenAI API Configuration (Optional)
 OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_DEFAULT_MODEL=gpt-3.5-turbo
 
-# Optional: Default model (defaults to gpt-3.5-turbo)
-OPENAI_DEFAULT_MODEL=gpt-4o
-
-# Optional: Custom OpenAI API endpoint
-OPENAI_API_BASE_URL=https://api.openai.com/v1
+# Google Gemini API Configuration (Optional)
+GOOGLE_AI_API_KEY=your_google_ai_api_key_here
+GEMINI_MODEL=gemini-1.5-flash
 ```
 
 ### Configuration File
@@ -37,24 +39,48 @@ Create a `.env` file in the `axum-app` directory:
 # Copy the example template
 cp .env.example .env
 
-# Edit with your OpenAI API key
+# Edit with your API keys
 OPENAI_API_KEY=sk-your-openai-api-key
-OPENAI_DEFAULT_MODEL=gpt-3.5-turbo
+GOOGLE_AI_API_KEY=your_google_ai_api_key_here
+GEMINI_MODEL=gemini-1.5-flash
 ```
 
 ### Fallback Behavior
 
-- **With OpenAI API**: Real GPT responses with streaming support
-- **Without OpenAI API**: Intelligent fallback responses with warning messages
+- **With API Keys**: Real AI responses with streaming support
+- **Without API Keys**: Intelligent fallback responses with warning messages
 - **API Errors**: Graceful degradation to fallback responses with error details
 
 ### Supported Models
 
+**OpenAI Models:**
 - `gpt-4o` - Latest GPT-4 model
 - `gpt-4o-mini` - Smaller, faster GPT-4 model
 - `gpt-4-turbo` - Turbo variant of GPT-4
 - `gpt-4` - Original GPT-4 model
 - `gpt-3.5-turbo` - Default fallback model
+
+**Google Gemini Models:**
+- `gemini-1.5-flash` - Fast, cost-effective
+- `gemini-1.5-pro` - More capable, slower
+- `gemini-1.5-flash-8b` - Smaller, faster
+- `gemini-pro` - Previous generation
+- `gemini-pro-vision` - Multimodal
+
+### Automatic Provider Detection
+
+The system automatically routes requests based on the model name:
+
+```javascript
+// Routes to OpenAI
+{ model: "gpt-4", messages: [...] }
+
+// Routes to Gemini
+{ model: "gemini-1.5-flash", messages: [...] }
+
+// Default to OpenAI for unknown models
+{ model: "unknown-model", messages: [...] }
+```
 
 ### Real vs Mock Response Examples
 

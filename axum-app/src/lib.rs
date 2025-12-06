@@ -2,6 +2,7 @@ mod routes;
 mod todo;
 mod chat;
 mod openai_service;
+mod gemini_service;
 
 use axum::{
     routing::{get, post},
@@ -10,6 +11,7 @@ use axum::{
 use routes::{create_todo, delete_todo, list_todos, toggle_todo};
 use chat::{chat_completion, legacy_chat_handler};
 use openai_service::OpenAIService;
+use gemini_service::GeminiService;
 use std::sync::{Arc, Mutex};
 use todo::Todo;
 
@@ -17,6 +19,7 @@ use todo::Todo;
 pub struct AppState {
     todos: Arc<Mutex<Vec<Todo>>>,
     openai_service: Option<Arc<OpenAIService>>,
+    gemini_service: Option<Arc<GeminiService>>,
 }
 
 impl Default for AppState {
@@ -26,9 +29,15 @@ impl Default for AppState {
             .ok()
             .map(Arc::new);
 
+        // Try to initialize Gemini service from environment
+        let gemini_service = GeminiService::from_env()
+            .ok()
+            .map(Arc::new);
+
         Self {
             todos: Arc::new(Mutex::new(Vec::new())),
             openai_service,
+            gemini_service,
         }
     }
 }

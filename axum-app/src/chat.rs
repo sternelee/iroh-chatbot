@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::AppState;
+use crate::{AppState, GeminiService, OpenAIService};
 
 /// Chat message structure compatible with AI SDK
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +151,22 @@ pub struct Usage {
     pub total_tokens: u32,
 }
 
+/// Determine the provider based on model name
+fn get_provider_from_model(model: &str) -> Provider {
+    if model.starts_with("gemini") || model.starts_with("models/gemini") {
+        Provider::Gemini
+    } else {
+        Provider::OpenAI
+    }
+}
+
+/// AI provider enum
+#[derive(Debug, Clone, PartialEq)]
+enum Provider {
+    OpenAI,
+    Gemini,
+}
+
 /// Generate mock AI response
 fn generate_mock_response() -> &'static str {
     let responses = [
@@ -247,7 +263,7 @@ fn create_chat_response(messages: &[ChatMessage]) -> ChatMessage {
 }
 
 
-/// Chat completion endpoint - handles both streaming and non-streaming with real OpenAI
+/// Chat completion endpoint - handles both OpenAI and Gemini with streaming and non-streaming
 pub async fn chat_completion(
     State(state): State<AppState>,
     Json(request): Json<ChatCompletionRequest>,
@@ -256,6 +272,27 @@ pub async fn chat_completion(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    // Determine provider based on model (default to OpenAI)
+    let model = request.model.clone().unwrap_or_else(|| "gpt-3.5-turbo".to_string());
+    let provider = get_provider_from_model(&model);
+
+    // Route to appropriate provider
+    match provider {
+        Provider::OpenAI => {
+            handle_openai_request(state, request, &model).await
+        }
+        Provider::Gemini => {
+            handle_gemini_request(state, request, &model).await
+        }
+    }
+}
+
+/// Handle OpenAI requests
+async fn handle_openai_request(
+    state: AppState,
+    request: ChatCompletionRequest,
+    model: &str,
+) -> Result<Response, StatusCode> {
     // Check if OpenAI service is available
     let openai_service = match &state.openai_service {
         Some(service) => service,
@@ -269,7 +306,7 @@ pub async fn chat_completion(
     if request.stream.unwrap_or(false) {
         // Streaming response
         match openai_service
-            .chat_completion_stream(request.messages, request.model.clone())
+            .chat_completion_stream(request.messages, Some(model.to_string()))
             .await
         {
             Ok(openai_stream) => {
@@ -326,7 +363,7 @@ pub async fn chat_completion(
     } else {
         // Non-streaming response
         match openai_service
-            .chat_completion(request.messages, request.model.clone())
+            .chat_completion(request.messages, Some(model.to_string()))
             .await
         {
             Ok(response) => Ok(Json(response).into_response()),
@@ -337,6 +374,96 @@ pub async fn chat_completion(
                         "message": format!("OpenAI API error: {}", e),
                         "type": "api_error",
                         "code": "openai_error"
+                    }
+                }));
+                Ok((StatusCode::INTERNAL_SERVER_ERROR, error_response).into_response())
+            }
+        }
+    }
+}
+
+/// Handle Gemini requests
+async fn handle_gemini_request(
+    state: AppState,
+    request: ChatCompletionRequest,
+    model: &str,
+) -> Result<Response, StatusCode> {
+    // Check if Gemini service is available
+    let gemini_service = match &state.gemini_service {
+        Some(service) => service,
+        None => {
+            // Fallback to mock response if Gemini service is not configured
+            return handle_fallback_response(request).await;
+        }
+    };
+
+    // Check if streaming is requested
+    if request.stream.unwrap_or(false) {
+        // Streaming response
+        let gemini_stream = gemini_service
+            .chat_completion_stream(
+                request.messages,
+                Some(model.to_string()),
+                request.temperature,
+                request.max_tokens,
+            )
+            .await;
+
+        let sse_stream = stream! {
+            for await result in gemini_stream {
+                match result {
+                    Ok(chunk) => {
+                        yield Ok::<Event, Box<dyn std::error::Error + Send + Sync>>(
+                            Event::default().json_data(chunk)
+                                .unwrap_or_else(|_| Event::default().data("serialization error"))
+                        );
+                    }
+                    Err(e) => {
+                        yield Ok::<Event, Box<dyn std::error::Error + Send + Sync>>(
+                            Event::default().data(format!("error: {}", e))
+                        );
+                    }
+                }
+            }
+        };
+
+        let sse_response = Sse::new(sse_stream)
+            .keep_alive(
+                axum::response::sse::KeepAlive::new()
+                    .interval(Duration::from_secs(15))
+                    .text("keep-alive-text"),
+            )
+            .into_response();
+
+        // Add AI SDK compatible headers
+        let mut response = sse_response;
+        let headers = response.headers_mut();
+        headers.insert("content-type", "text/event-stream".parse().unwrap());
+        headers.insert("cache-control", "no-cache".parse().unwrap());
+        headers.insert("connection", "keep-alive".parse().unwrap());
+        headers.insert("x-vercel-ai-ui-message-stream", "v1".parse().unwrap());
+        headers.insert("x-accel-buffering", "no".parse().unwrap());
+
+        Ok(response)
+    } else {
+        // Non-streaming response
+        match gemini_service
+            .chat_completion(
+                request.messages,
+                Some(model.to_string()),
+                request.temperature,
+                request.max_tokens,
+            )
+            .await
+        {
+            Ok(response) => Ok(Json(response).into_response()),
+            Err(e) => {
+                // Return error response
+                let error_response = Json(serde_json::json!({
+                    "error": {
+                        "message": format!("Gemini API error: {}", e),
+                        "type": "api_error",
+                        "code": "gemini_error"
                     }
                 }));
                 Ok((StatusCode::INTERNAL_SERVER_ERROR, error_response).into_response())
@@ -493,10 +620,11 @@ mod tests {
     use tower::ServiceExt;
 
     fn create_test_app() -> Router {
-        // Create test state without OpenAI service
+        // Create test state without services to force fallback mode
         let state = crate::AppState {
             todos: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
             openai_service: None, // Force fallback mode for tests
+            gemini_service: None,  // Force fallback mode for tests
         };
         Router::new()
             .route("/api/chat", post(super::legacy_chat_handler))
@@ -596,5 +724,49 @@ mod tests {
         let response = app.oneshot(request).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_gemini_model_routing() {
+        let app = create_test_app();
+
+        let request_body = json!({
+            "messages": [
+                {
+                    "id": "msg1",
+                    "role": "user",
+                    "content": "Hello Gemini!"
+                }
+            ],
+            "model": "gemini-1.5-flash",
+            "stream": false
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/v1/chat/completions")
+            .header("content-type", "application/json")
+            .body(Body::from(request_body.to_string()))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+
+        // Should return 200 even with fallback (Gemini service not configured)
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_provider_detection() {
+        // Test OpenAI model detection
+        assert_eq!(get_provider_from_model("gpt-4"), Provider::OpenAI);
+        assert_eq!(get_provider_from_model("gpt-3.5-turbo"), Provider::OpenAI);
+
+        // Test Gemini model detection
+        assert_eq!(get_provider_from_model("gemini-1.5-flash"), Provider::Gemini);
+        assert_eq!(get_provider_from_model("gemini-pro"), Provider::Gemini);
+        assert_eq!(get_provider_from_model("models/gemini-1.5-pro"), Provider::Gemini);
+
+        // Test default to OpenAI
+        assert_eq!(get_provider_from_model("unknown-model"), Provider::OpenAI);
     }
 }

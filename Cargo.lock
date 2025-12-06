@@ -340,6 +340,7 @@ dependencies = [
  "async-stream",
  "axum 0.8.7",
  "axum-test",
+ "base64 0.22.1",
  "chrono",
  "dotenvy",
  "fastrand",
@@ -350,6 +351,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tower",
+ "url",
 ]
 
 [[package]]
