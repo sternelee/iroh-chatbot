@@ -1,10 +1,10 @@
 mod routes;
 mod todo;
 mod chat;
-mod openai_service;
-mod gemini_service;
-mod anthropic_service;
+mod providers;
 mod database;
+mod agent;
+mod agent_api;
 
 use axum::{
     routing::{get, post},
@@ -12,10 +12,10 @@ use axum::{
 };
 use routes::{create_todo, delete_todo, list_todos, toggle_todo};
 use chat::{chat_completion, legacy_chat_handler};
-use openai_service::OpenAIService;
-use gemini_service::GeminiService;
-use anthropic_service::AnthropicService;
+use providers::{OpenAIService, GeminiService, AnthropicService};
 use database::ChatDatabase;
+use agent::AgentManager;
+use agent_api::agent_routes;
 use std::sync::{Arc, Mutex};
 use todo::Todo;
 use dotenvy::dotenv;
@@ -27,6 +27,7 @@ pub struct AppState {
     gemini_service: Option<Arc<GeminiService>>,
     anthropic_service: Option<Arc<AnthropicService>>,
     database: Option<Arc<ChatDatabase>>,
+    agent_manager: Arc<AgentManager>,
 }
 
 impl AppState {
@@ -58,12 +59,19 @@ impl AppState {
             .ok()
             .map(Arc::new);
 
+        // Initialize agent manager and register default tools
+        let agent_manager = Arc::new(AgentManager::new());
+        for tool in agent::create_default_tools() {
+            let _ = agent_manager.register_tool(tool).await;
+        }
+
         Self {
             todos: Arc::new(Mutex::new(Vec::new())),
             openai_service,
             gemini_service,
             anthropic_service,
             database,
+            agent_manager,
         }
     }
 }
@@ -75,10 +83,12 @@ pub async fn create_axum_app() -> Router {
         // Legacy Todo routes (keeping for backward compatibility)
         .route("/", get(list_todos))
         .route("/todo", post(create_todo))
-        .route("/todo/{:id}/delete", post(delete_todo))
-        .route("/todo/{:id}/toggle", post(toggle_todo))
+        .route("/todo/{id}/delete", post(delete_todo))
+        .route("/todo/{id}/toggle", post(toggle_todo))
         // Chat API routes
         .route("/api/chat", post(legacy_chat_handler))
         .route("/api/v1/chat/completions", post(chat_completion))
+        // Agent API routes
+        .nest("/api", agent_routes())
         .with_state(state)
 }

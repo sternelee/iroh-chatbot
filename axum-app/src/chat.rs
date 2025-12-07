@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::{AppState, GeminiService, OpenAIService, AnthropicService};
+use crate::{AppState};
+use crate::providers::{GeminiService, OpenAIService, AnthropicService};
 
 /// Chat message structure compatible with AI SDK
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -312,7 +313,7 @@ async fn handle_openai_request(
     if request.stream.unwrap_or(false) {
         // Streaming response
         match openai_service
-            .chat_completion_stream(request.messages, Some(model.to_string()))
+            .chat_completion_stream(request.messages, Some(model.to_string()), request.temperature, request.max_tokens)
             .await
         {
             Ok(openai_stream) => {
@@ -369,7 +370,7 @@ async fn handle_openai_request(
     } else {
         // Non-streaming response
         match openai_service
-            .chat_completion(request.messages, Some(model.to_string()))
+            .chat_completion(request.messages, Some(model.to_string()), request.temperature, request.max_tokens)
             .await
         {
             Ok(response) => Ok(Json(response).into_response()),
@@ -675,7 +676,7 @@ pub async fn legacy_chat_handler(
 
     // Use OpenAI service if available
     if let Some(openai_service) = &state.openai_service {
-        match openai_service.chat_completion(chat_messages, None).await {
+        match openai_service.chat_completion(chat_messages, None, None, None).await {
             Ok(response) => {
                 Ok(Json(serde_json::json!({
                     "role": "assistant",

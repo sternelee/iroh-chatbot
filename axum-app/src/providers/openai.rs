@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_stream::stream;
+use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::chat::{ChatMessage, ChatRole, UIMessageChunk};
+use super::AIProvider;
 
 #[derive(Debug, Clone)]
 pub struct OpenAIService {
@@ -83,7 +85,13 @@ impl OpenAIService {
     }
 
     /// Send chat completion request (non-streaming)
-    pub async fn chat_completion(&self, messages: Vec<ChatMessage>, model: Option<String>) -> Result<ChatMessage> {
+    pub async fn chat_completion(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: Option<String>,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
+    ) -> Result<ChatMessage> {
         let openai_messages: Vec<OpenAIChatMessage> =
             messages.into_iter().map(Self::convert_to_openai_message).collect();
 
@@ -92,8 +100,8 @@ impl OpenAIService {
         let request = OpenAIChatRequest {
             model: model_name,
             messages: openai_messages,
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: temperature.unwrap_or(0.7),
+            max_tokens: max_tokens.unwrap_or(1000),
             stream: false,
         };
 
@@ -120,6 +128,8 @@ impl OpenAIService {
         &self,
         messages: Vec<ChatMessage>,
         model: Option<String>,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
     ) -> Result<BoxStream<'static, Result<UIMessageChunk, anyhow::Error>>> {
         let openai_messages: Vec<OpenAIChatMessage> =
             messages.into_iter().map(Self::convert_to_openai_message).collect();
@@ -129,8 +139,8 @@ impl OpenAIService {
         let request = OpenAIChatRequest {
             model: model_name,
             messages: openai_messages,
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: temperature.unwrap_or(0.7),
+            max_tokens: max_tokens.unwrap_or(1000),
             stream: true,
         };
 
@@ -268,6 +278,33 @@ struct OpenAIUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
     total_tokens: u32,
+}
+
+#[async_trait]
+impl AIProvider for OpenAIService {
+    async fn chat_completion(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: Option<String>,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
+    ) -> Result<ChatMessage> {
+        Self::chat_completion(self, messages, model, temperature, max_tokens).await
+    }
+
+    async fn chat_completion_stream(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: Option<String>,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
+    ) -> BoxStream<'static, Result<UIMessageChunk, anyhow::Error>> {
+        Self::chat_completion_stream(self, messages, model, temperature, max_tokens).await.unwrap()
+    }
+
+    fn get_available_models(&self) -> Vec<&'static str> {
+        Self::get_model_options()
+    }
 }
 
 #[cfg(test)]

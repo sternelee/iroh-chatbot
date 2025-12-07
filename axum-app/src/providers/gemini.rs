@@ -7,6 +7,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::chat::{ChatMessage, ChatRole, UIMessageChunk};
+use async_trait::async_trait;
+use super::AIProvider;
 
 /// Google Gemini API Service
 /// Provides integration with Google's Gemini AI models
@@ -395,6 +397,33 @@ struct GeminiSafetyRating {
     category: String,
     probability: String,
     blocked: Option<bool>,
+}
+
+#[async_trait]
+impl AIProvider for GeminiService {
+    async fn chat_completion(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: Option<String>,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
+    ) -> Result<ChatMessage> {
+        self.chat_completion(messages, model, temperature, max_tokens).await
+    }
+
+    async fn chat_completion_stream(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: Option<String>,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
+    ) -> BoxStream<'static, Result<UIMessageChunk, anyhow::Error>> {
+        self.chat_completion_stream(messages, model, temperature, max_tokens).await
+    }
+
+    fn get_available_models(&self) -> Vec<&'static str> {
+        Self::get_model_options()
+    }
 }
 
 #[cfg(test)]
