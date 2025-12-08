@@ -28,22 +28,17 @@ fn greet(name: &str) -> String {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::async_runtime::spawn(async move {
-        let router: Router = create_axum_app().await;
+pub async fn run() {
+    let router: Router = create_axum_app().await;
 
-        let app_state = AppState {
-            router: Arc::new(Mutex::new(router)),
-        };
+    let app_state = AppState {
+        router: Arc::new(Mutex::new(router)),
+    };
 
-        tauri::Builder::default()
-            .plugin(tauri_plugin_opener::init())
-            .manage(app_state)
-            .invoke_handler(tauri::generate_handler![local_app_request])
-            .run(tauri::generate_context!())
-            .expect("error while running tauri application");
-    });
-
-    // Keep the main thread alive
-    std::thread::park();
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .manage(app_state)
+        .invoke_handler(tauri::generate_handler![local_app_request])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
