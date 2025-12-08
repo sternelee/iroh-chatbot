@@ -1,0 +1,20 @@
+{
+  "global": {
+    "timeout": 30,
+    "auto_reconnect": true,
+    "max_retries": 3
+  },
+  "servers": {
+    "memory": {
+      "name": "memory",
+      "transport": "stdio",
+      "endpoint": "npx @modelcontextprotocol/server-memory",
+      "enabled": true,
+      "description": "内存 MCP 服务器 - 提供临时存储和检索功能",
+      "tags": ["memory", "tools", "local"],
+      "auth": {
+        "type": "none"
+      }
+    }
+  }
+}

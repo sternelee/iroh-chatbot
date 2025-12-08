@@ -1,0 +1,126 @@
+{
+  "global": {
+    "timeout": 30,
+    "auto_reconnect": true,
+    "max_retries": 3
+  },
+  "servers": {
+    "local-dev": {
+      "name": "local-dev",
+      "transport": "sse",
+      "endpoint": "http://localhost:8080/sse",
+      "enabled": true,
+      "description": "本地开发 MCP 服务器",
+      "tags": ["development", "local"],
+      "auth": {
+        "type": "api_key",
+        "key": "dev-api-key",
+        "header": "X-API-Key"
+      }
+    },
+    "tools": {
+      "name": "tools",
+      "transport": "stdio",
+      "endpoint": "python -m mcp_server_tools",
+      "enabled": true,
+      "description": "本地工具 MCP 服务器",
+      "tags": ["tools", "local"],
+      "auth": {
+        "type": "none"
+      }
+    },
+    "filesystem": {
+      "name": "filesystem",
+      "transport": "stdio",
+      "endpoint": "npx @modelcontextprotocol/server-filesystem",
+      "enabled": false,
+      "description": "文件系统 MCP 服务器",
+      "tags": ["filesystem", "tools"],
+      "auth": {
+        "type": "none"
+      }
+    },
+    "github": {
+      "name": "github",
+      "transport": "sse",
+      "endpoint": "https://api.github.com/mcp",
+      "enabled": false,
+      "description": "GitHub MCP 服务器",
+      "tags": ["github", "development", "remote"],
+      "auth": {
+        "type": "bearer",
+        "token": "${GITHUB_TOKEN}"
+      }
+    },
+    "brave-search": {
+      "name": "brave-search",
+      "transport": "sse",
+      "endpoint": "https://api.search.brave.com/mcp",
+      "enabled": false,
+      "description": "Brave 搜索 MCP 服务器",
+      "tags": ["search", "web", "remote"],
+      "auth": {
+        "type": "api_key",
+        "key": "${BRAVE_API_KEY}",
+        "header": "X-Subscription-Token"
+      }
+    },
+    "sqlite": {
+      "name": "sqlite",
+      "transport": "stdio",
+      "endpoint": "npx @modelcontextprotocol/server-sqlite",
+      "enabled": false,
+      "description": "SQLite 数据库 MCP 服务器",
+      "tags": ["database", "sqlite", "tools"],
+      "auth": {
+        "type": "none"
+      }
+    },
+    "memory": {
+      "name": "memory",
+      "transport": "stdio",
+      "endpoint": "npx @modelcontextprotocol/server-memory",
+      "enabled": true,
+      "description": "内存 MCP 服务器",
+      "tags": ["memory", "tools", "local"],
+      "auth": {
+        "type": "none"
+      }
+    },
+    "puppeteer": {
+      "name": "puppeteer",
+      "transport": "stdio",
+      "endpoint": "npx @modelcontextprotocol/server-puppeteer",
+      "enabled": false,
+      "description": "Puppeteer 网页自动化 MCP 服务器",
+      "tags": ["automation", "web", "tools"],
+      "auth": {
+        "type": "none"
+      }
+    },
+    "sequential-thinking": {
+      "name": "sequential-thinking",
+      "transport": "stdio",
+      "endpoint": "npx @modelcontextprotocol/server-sequential-thinking",
+      "enabled": false,
+      "description": "顺序思考 MCP 服务器",
+      "tags": ["thinking", "tools"],
+      "auth": {
+        "type": "none"
+      }
+    },
+    "everything": {
+      "name": "everything",
+      "transport": "http",
+      "endpoint": "http://localhost:8081/mcp",
+      "enabled": false,
+      "description": "Everything 文件搜索 MCP 服务器",
+      "tags": ["search", "filesystem", "windows"],
+      "auth": {
+        "type": "api_key",
+        "key": "${EVERYTHING_API_KEY}",
+        "header": "Authorization"
+      }
+    }
+  }
+}

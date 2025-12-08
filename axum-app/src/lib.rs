@@ -5,6 +5,7 @@ mod providers;
 mod database;
 mod agent;
 mod agent_api;
+mod mcp;
 
 use axum::{
     routing::{get, post},
@@ -16,6 +17,7 @@ use providers::{OpenAIService, GeminiService, AnthropicService};
 use database::ChatDatabase;
 use agent::AgentManager;
 use agent_api::agent_routes;
+use mcp::{MCPToolManager, MCPServerManager};
 use std::sync::{Arc, Mutex};
 use todo::Todo;
 use dotenvy::dotenv;
@@ -28,6 +30,8 @@ pub struct AppState {
     anthropic_service: Option<Arc<AnthropicService>>,
     database: Option<Arc<ChatDatabase>>,
     agent_manager: Arc<AgentManager>,
+    mcp_tool_manager: Arc<MCPToolManager>,
+    mcp_server_manager: Arc<MCPServerManager>,
 }
 
 impl AppState {
@@ -65,6 +69,26 @@ impl AppState {
             let _ = agent_manager.register_tool(tool).await;
         }
 
+        // Initialize MCP tool manager and server manager
+        let mcp_tool_manager = Arc::new(MCPToolManager::new());
+        let mcp_server_manager = match MCPServerManager::new().await {
+            Ok(manager) => {
+                let arc_manager = Arc::new(manager);
+                // Try to initialize MCP servers from configuration
+                // This will connect to configured MCP servers and load their tools
+                if let Err(e) = arc_manager.initialize().await {
+                    tracing::warn!("Failed to initialize MCP servers: {}", e);
+                }
+                arc_manager
+            }
+            Err(e) => {
+                tracing::error!("Failed to create MCP server manager: {}", e);
+                // Create a dummy server manager that won't connect to any servers
+                // This prevents the app from crashing if MCP config is invalid
+                Arc::new(MCPServerManager::with_config_path("nonexistent.json").await.unwrap())
+            }
+        };
+
         Self {
             todos: Arc::new(Mutex::new(Vec::new())),
             openai_service,
@@ -72,6 +96,8 @@ impl AppState {
             anthropic_service,
             database,
             agent_manager,
+            mcp_tool_manager,
+            mcp_server_manager,
         }
     }
 }
