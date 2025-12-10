@@ -14,7 +14,7 @@ struct AppState {
 async fn local_app_request(
     state: State<'_, AppState>,
     local_request: LocalRequest,
-) -> Result<LocalResponse, ()> {
+) -> Result<LocalResponse, String> {
     let mut router = state.router.lock().await;
 
     let response = local_request.send_to_router(&mut router).await;

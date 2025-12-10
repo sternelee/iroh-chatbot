@@ -43,7 +43,7 @@ url = "2.5.7"
 # Anthropic Claude API dependencies
 sha2 = "0.10.8"
 # Database dependencies
-libsql = "0.6"
+libsql = "0.9"
 # Logging dependencies
 tracing = "0.1"
 

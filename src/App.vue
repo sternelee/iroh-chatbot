@@ -142,7 +142,7 @@
     PanelLeft,
   } from 'lucide-vue-next'
   import type { PromptInputMessage } from '@/components/ai-elements/prompt-input'
-  import { useChat } from '@ai-sdk/vue'
+  import { useCompletion } from '@ai-sdk/vue'
 
   interface Attachment {
     type: 'file'
@@ -185,9 +185,80 @@
     metadata?: Record<string, unknown>
   }
 
-  // Initialize ai-sdk/vue useChat - it will automatically use /api/chat endpoint
-  const { messages, handleSubmit, isLoading, error } = useChat({
+  // Custom fetch function to handle Tauri byte array responses
+  const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    // Only use custom fetch for API calls in Tauri environment
+    if (typeof window !== 'undefined' && window.__TAURI__ && typeof input === 'string' && input.startsWith('/api/')) {
+      try {
+        console.log('🚀 Custom fetch called for:', input)
+        const { invoke } = await import('@tauri-apps/api/core')
+
+        // Parse the URL and request body
+        const url = new URL(input, window.location.origin)
+        const body = init?.body ? (typeof init.body === 'string' ? init.body : JSON.stringify(init.body)) : null
+
+        console.log('📤 Request to Tauri:', {
+          uri: url.pathname + url.search,
+          method: init?.method || 'GET',
+          headers: init?.headers || {},
+          body: body
+        })
+
+        // Call Tauri's local_app_request
+        const response = await invoke('local_app_request', {
+          localRequest: {
+            uri: url.pathname + url.search,
+            method: init?.method || 'GET',
+            headers: init?.headers || {},
+            body: body
+          }
+        })
+
+        console.log('📥 Raw Tauri response:', response)
+
+        // Handle the response from Tauri
+        const tauriResponse = response as { status_code: number; body: number[] | string; headers: Record<string, string> }
+
+        // Convert body to string if it's a byte array
+        let bodyText: string
+        if (Array.isArray(tauriResponse.body)) {
+          console.log('🔄 Converting byte array to string:', tauriResponse.body.slice(0, 20), '...')
+          bodyText = new TextDecoder().decode(new Uint8Array(tauriResponse.body))
+          console.log('✅ Converted body:', bodyText)
+        } else {
+          bodyText = tauriResponse.body
+          console.log('✅ Body already string:', bodyText)
+        }
+
+        // Return a proper Response object
+        const finalResponse = new Response(bodyText, {
+          status: tauriResponse.status_code,
+          headers: tauriResponse.headers
+        })
+
+        console.log('🎯 Final response object:', {
+          status: finalResponse.status,
+          headers: Object.fromEntries(finalResponse.headers.entries()),
+          bodyUsed: finalResponse.bodyUsed
+        })
+
+        return finalResponse
+      } catch (error) {
+        console.error('❌ Tauri fetch error:', error)
+        // Fallback to regular fetch if Tauri call fails
+        console.log('🔄 Falling back to regular fetch')
+        return fetch(input, init)
+      }
+    }
+
+    // Use regular fetch for non-API calls or non-Tauri environments
+    return fetch(input, init)
+  }
+
+  // Initialize ai-sdk/vue useCompletion - for single prompt/response completion
+  const { completion, isLoading, error, complete } = useCompletion({
     api: '/api/chat',
+    fetch: customFetch,
   })
 
   const input = ref('')
@@ -195,7 +266,7 @@
   const conversations = ref<ConversationData[]>([])
   const currentConversationId = ref<string>('')
   const searchQuery = ref('')
-  const status = computed(() => isLoading.value ? 'loading' : (error.value ? 'error' : 'idle'))
+  const status = computed(() => (isLoading.value ? 'loading' : error.value ? 'error' : 'idle'))
   const selectedModel = ref('gpt-3.5-turbo')
   const newChatDialogOpen = ref(false)
   const messagesContainer = ref<HTMLElement>()
@@ -587,35 +658,11 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
     currentConversationId.value = conversationId
 
     if (conversationId === '1') {
-      messages.value = [
-        {
-          id: '1-1',
-          role: 'assistant',
-          content: "Hello! I'm Iroh Chat, your AI assistant. How can I help you today?",
-          createdAt: new Date(),
-        },
-      ]
       // Keep demo enhanced messages for conversation 1
     } else if (conversationId === '2') {
-      messages.value = [
-        {
-          id: '2-1',
-          role: 'user',
-          content: 'Can you help me implement this new feature?',
-          createdAt: new Date(Date.now() - 300000),
-        },
-        {
-          id: '2-2',
-          role: 'assistant',
-          content:
-            "I'd be happy to help you with that feature. Let me break it down into manageable steps and guide you through the implementation process.",
-          createdAt: new Date(Date.now() - 180000),
-        },
-      ]
       // Clear enhanced messages for conversation 2
       enhancedMessages.value = []
     } else {
-      messages.value = []
       // Clear enhanced messages for new conversations
       enhancedMessages.value = []
     }
@@ -640,7 +687,6 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
 
     conversations.value.unshift(newConversation)
     currentConversationId.value = newId
-    messages.value = []
     enhancedMessages.value = [] // Clear enhanced messages for new conversations
     input.value = ''
     newChatDialogOpen.value = false
@@ -672,8 +718,8 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
     }
   }
 
-  // Cursor-style submit handler using ai-sdk/vue useChat
-  function handleCursorSubmit(message: PromptInputMessage) {
+  // Cursor-style submit handler using ai-sdk/vue useCompletion
+  async function handleCursorSubmit(message: PromptInputMessage) {
     const hasText = !!message.text
     const hasAttachments = !!message.files?.length
 
@@ -681,18 +727,32 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
       return
     }
 
-    // Use ai-sdk/vue handleSubmit - it will automatically POST to /api/chat
-    handleSubmit({
-      prompt: message.text || 'File uploaded',
-    })
+    const prompt = message.text || 'File uploaded'
 
-    // Add to enhanced messages for UI display
+    // Add user message to enhanced messages for UI display
     const newUserMessage: EnhancedMessage = {
       key: Date.now().toString(),
       from: 'user',
-      content: message.text || 'File uploaded',
+      content: prompt,
     }
     enhancedMessages.value.push(newUserMessage)
+
+    try {
+      // Use ai-sdk/vue complete function for completion
+      const response = await complete(prompt)
+
+      // Add assistant response to enhanced messages
+      if (response) {
+        const assistantMessage: EnhancedMessage = {
+          key: (Date.now() + 1).toString(),
+          from: 'assistant',
+          content: response,
+        }
+        enhancedMessages.value.push(assistantMessage)
+      }
+    } catch (err) {
+      console.error('Completion error:', err)
+    }
   }
 
   function getBotResponse(_userMessage: string): string {
@@ -711,9 +771,9 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
     return responses[Math.floor(Math.random() * responses.length)]
   }
 
-  // Watch for message changes to trigger auto-scroll
+  // Watch for enhanced message changes to trigger auto-scroll
   watch(
-    messages,
+    enhancedMessages,
     async () => {
       await scrollToBottom()
     },
@@ -887,9 +947,9 @@ The beauty of the Composition API is that it lets you reuse stateful logic witho
                     <History class="size-4 shrink-0" />
                     <div class="flex-1 min-w-0 overflow-hidden">
                       <div class="flex items-center gap-1.5 mb-0.5">
-                        <span class="font-medium text-sm truncate flex-1">{{
-                          conversation.title
-                        }}</span>
+                        <span class="font-medium text-sm truncate flex-1">
+                          {{ conversation.title }}
+                        </span>
                         <Badge
                           :variant="getModelBadgeVariant(conversation.model)"
                           class="text-[10px] px-1 py-0 shrink-0"

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 // Import shared types from chat module
-use crate::chat::{ChatMessage, ChatRole, Attachment, Usage};
+use crate::chat::{Attachment, ChatMessage, ChatRole, Usage};
 
 /// Database manager for conversation storage
 #[derive(Debug, Clone)]
@@ -86,7 +86,9 @@ impl ChatDatabase {
     /// Save an enhanced message (AI SDK compatible)
     pub async fn save_enhanced_message(&self, message: &EnhancedMessage) -> Result<()> {
         let mut messages = self.messages.write().await;
-        let conversation_messages = messages.entry(message.conversation_id.clone()).or_insert_with(Vec::new);
+        let conversation_messages = messages
+            .entry(message.conversation_id.clone())
+            .or_insert_with(Vec::new);
 
         // Remove existing message with same ID if it exists
         conversation_messages.retain(|m| m.id != message.id);
@@ -96,11 +98,20 @@ impl ChatDatabase {
 
         // Sort messages by created_at
         if let Some(created_at) = message.created_at {
-            conversation_messages.sort_by(|a, b| a.created_at.unwrap_or_default().cmp(&b.created_at.unwrap_or_default()));
+            conversation_messages.sort_by(|a, b| {
+                a.created_at
+                    .unwrap_or_default()
+                    .cmp(&b.created_at.unwrap_or_default())
+            });
         }
 
         // Update conversation's updated_at timestamp
-        if let Some(conversation) = self.conversations.read().await.get(&message.conversation_id) {
+        if let Some(conversation) = self
+            .conversations
+            .read()
+            .await
+            .get(&message.conversation_id)
+        {
             let mut conversations = self.conversations.write().await;
             if let Some(conv) = conversations.get_mut(&message.conversation_id) {
                 conv.updated_at = message.created_at.unwrap_or_else(|| chrono::Utc::now());
@@ -113,7 +124,9 @@ impl ChatDatabase {
     /// Save a legacy ChatMessage (backward compatibility)
     pub async fn save_chat_message(&self, message: &ChatMessage) -> Result<()> {
         let mut chat_messages = self.chat_messages.write().await;
-        let conversation_messages = chat_messages.entry(extract_conversation_id(&message.id)).or_insert_with(Vec::new);
+        let conversation_messages = chat_messages
+            .entry(extract_conversation_id(&message.id))
+            .or_insert_with(Vec::new);
 
         // Remove existing message with same ID if it exists
         conversation_messages.retain(|m| m.id != message.id);
@@ -123,7 +136,9 @@ impl ChatDatabase {
 
         // Sort messages by created_at
         conversation_messages.sort_by(|a, b| {
-            a.created_at.unwrap_or_default().cmp(&b.created_at.unwrap_or_default())
+            a.created_at
+                .unwrap_or_default()
+                .cmp(&b.created_at.unwrap_or_default())
         });
 
         // Also convert to enhanced message and save
@@ -136,7 +151,9 @@ impl ChatDatabase {
     /// Legacy message save method (renamed from save_message)
     pub async fn save_legacy_message(&self, message: &Message) -> Result<()> {
         let mut messages = self.messages.write().await;
-        let conversation_messages = messages.entry(message.conversation_id.clone()).or_insert_with(Vec::new);
+        let conversation_messages = messages
+            .entry(message.conversation_id.clone())
+            .or_insert_with(Vec::new);
 
         // Convert legacy Message to EnhancedMessage
         let enhanced = convert_legacy_to_enhanced(message);
@@ -146,7 +163,10 @@ impl ChatDatabase {
     }
 
     /// Get all enhanced messages for a conversation
-    pub async fn get_enhanced_messages(&self, conversation_id: &str) -> Result<Vec<EnhancedMessage>> {
+    pub async fn get_enhanced_messages(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Vec<EnhancedMessage>> {
         let messages = self.messages.read().await;
         Ok(messages.get(conversation_id).cloned().unwrap_or_default())
     }
@@ -154,11 +174,17 @@ impl ChatDatabase {
     /// Get all legacy ChatMessages for a conversation
     pub async fn get_chat_messages(&self, conversation_id: &str) -> Result<Vec<ChatMessage>> {
         let chat_messages = self.chat_messages.read().await;
-        Ok(chat_messages.get(conversation_id).cloned().unwrap_or_default())
+        Ok(chat_messages
+            .get(conversation_id)
+            .cloned()
+            .unwrap_or_default())
     }
 
     /// Get ChatMessages (for backward compatibility)
-    pub async fn get_conversation_messages(&self, conversation_id: &str) -> Result<Vec<EnhancedMessage>> {
+    pub async fn get_conversation_messages(
+        &self,
+        conversation_id: &str,
+    ) -> Result<Vec<EnhancedMessage>> {
         self.get_enhanced_messages(conversation_id).await
     }
 
@@ -210,7 +236,9 @@ impl ChatDatabase {
             }
 
             // Also check legacy messages if no match found in enhanced messages
-            if matching_conversations.is_empty() || matching_conversations.last().unwrap().id != conversation.id {
+            if matching_conversations.is_empty()
+                || matching_conversations.last().unwrap().id != conversation.id
+            {
                 if let Some(conversation_messages) = chat_messages.get(&conversation.id) {
                     for message in conversation_messages {
                         if message.content.to_lowercase().contains(&query_lower) {
@@ -261,7 +289,8 @@ impl ChatDatabase {
             message_count: enhanced_count.max(chat_count),
             total_tokens,
             has_tool_calls,
-            last_activity: self.conversations
+            last_activity: self
+                .conversations
                 .read()
                 .await
                 .get(conversation_id)
@@ -430,7 +459,7 @@ fn convert_chat_to_enhanced(chat_message: &ChatMessage) -> EnhancedMessage {
     // Convert metadata from HashMap to serde_json::Value
     let metadata = chat_message.metadata.as_ref().map(|hashmap| {
         serde_json::Value::Object(serde_json::Map::from_iter(
-            hashmap.iter().map(|(k, v)| (k.clone(), v.clone()))
+            hashmap.iter().map(|(k, v)| (k.clone(), v.clone())),
         ))
     });
 
@@ -465,7 +494,7 @@ fn convert_legacy_to_enhanced(legacy_message: &Message) -> EnhancedMessage {
     // Convert metadata from HashMap to serde_json::Value
     let metadata = legacy_message.metadata.as_ref().map(|hashmap| {
         serde_json::Value::Object(serde_json::Map::from_iter(
-            hashmap.iter().map(|(k, v)| (k.clone(), v.clone()))
+            hashmap.iter().map(|(k, v)| (k.clone(), v.clone())),
         ))
     });
 
@@ -541,7 +570,12 @@ mod tests {
         db.save_conversation(&conversation).await.unwrap();
 
         // Create enhanced message
-        let message = create_enhanced_message(&conversation.id, ChatRole::User, "Hello, world!", Some("gpt-3.5-turbo".to_string()));
+        let message = create_enhanced_message(
+            &conversation.id,
+            ChatRole::User,
+            "Hello, world!",
+            Some("gpt-3.5-turbo".to_string()),
+        );
         db.save_enhanced_message(&message).await.unwrap();
 
         // Get messages
@@ -693,14 +727,21 @@ mod tests {
         db.save_legacy_message(&message).await.unwrap();
 
         // Get messages
-        let messages = db.get_conversation_messages(&conversation.id).await.unwrap();
+        let messages = db
+            .get_conversation_messages(&conversation.id)
+            .await
+            .unwrap();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].content, "Hello, legacy!");
         assert_eq!(messages[0].role, ChatRole::User); // Should be converted to ChatRole
 
         // Delete message
         db.delete_message(&message.id).await.unwrap();
-        let messages = db.get_conversation_messages(&conversation.id).await.unwrap();
+        let messages = db
+            .get_conversation_messages(&conversation.id)
+            .await
+            .unwrap();
         assert_eq!(messages.len(), 0);
     }
 }
+

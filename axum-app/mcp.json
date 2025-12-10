@@ -15,6 +15,17 @@
       "auth": {
         "type": "none"
       }
+    },
+    "filesystem": {
+      "name": "filesystem",
+      "transport": "stdio",
+      "endpoint": "npx @modelcontextprotocol/server-filesystem",
+      "enabled": true,
+      "description": "文件系统 MCP 服务器 - 提供文件读写功能",
+      "tags": ["filesystem", "tools", "local"],
+      "auth": {
+        "type": "none"
+      }
     }
   }
 }

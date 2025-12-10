@@ -622,6 +622,136 @@ async fn handle_fallback_response(request: ChatCompletionRequest) -> Result<Resp
     }
 }
 
+/// Completion endpoint for useCompletion hook from AI SDK
+#[derive(Debug, Deserialize)]
+pub struct CompletionRequest {
+    pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream: Option<bool>,
+}
+
+/// Completion endpoint for AI SDK useCompletion
+pub async fn completion_handler(
+    State(state): State<AppState>,
+    Json(request): Json<CompletionRequest>,
+) -> Result<Response, StatusCode> {
+    // Determine model first
+    let model = request.model.clone().unwrap_or_else(|| "gpt-3.5-turbo".to_string());
+    let provider = get_provider_from_model(&model);
+
+    // Create a simple chat request for completion
+    let chat_request = ChatCompletionRequest {
+        messages: vec![
+            ChatMessage {
+                id: "user".to_string(),
+                role: ChatRole::User,
+                content: request.prompt,
+                created_at: Some(chrono::Utc::now()),
+                attachments: None,
+                metadata: None,
+            }
+        ],
+        model: request.model,
+        stream: Some(false), // Always use non-streaming for useCompletion
+        temperature: request.temperature,
+        max_tokens: request.max_tokens,
+        top_p: None,
+        frequency_penalty: None,
+        presence_penalty: None,
+        stop: None,
+        user: None,
+        logit_bias: None,
+    };
+
+    // Route to appropriate provider
+    match provider {
+        Provider::OpenAI => {
+            handle_openai_completion(state, chat_request, &model).await
+        }
+        Provider::Gemini => {
+            handle_gemini_completion(state, chat_request, &model).await
+        }
+        Provider::Anthropic => {
+            handle_anthropic_completion(state, chat_request, &model).await
+        }
+    }
+}
+
+/// Handle OpenAI completion and extract content
+async fn handle_openai_completion(
+    state: AppState,
+    request: ChatCompletionRequest,
+    model: &str,
+) -> Result<Response, StatusCode> {
+    if let Some(openai_service) = &state.openai_service {
+        match openai_service.chat_completion(request.messages, Some(model.to_string()), request.temperature, request.max_tokens).await {
+            Ok(chat_message) => {
+                // Return just the content as a plain string for useCompletion
+                Ok(axum::response::Json(chat_message.content).into_response())
+            }
+            Err(e) => {
+                // Fallback to mock response
+                let mock_content = generate_mock_response().to_string();
+                Ok(axum::response::Json(mock_content).into_response())
+            }
+        }
+    } else {
+        // Fallback to mock response
+        let mock_content = generate_mock_response().to_string();
+        Ok(axum::response::Json(mock_content).into_response())
+    }
+}
+
+/// Handle Gemini completion and extract content
+async fn handle_gemini_completion(
+    state: AppState,
+    request: ChatCompletionRequest,
+    model: &str,
+) -> Result<Response, StatusCode> {
+    if let Some(gemini_service) = &state.gemini_service {
+        match gemini_service.chat_completion(request.messages, Some(model.to_string()), request.temperature, request.max_tokens).await {
+            Ok(chat_message) => {
+                Ok(axum::response::Json(chat_message.content).into_response())
+            }
+            Err(e) => {
+                let mock_content = generate_mock_response().to_string();
+                Ok(axum::response::Json(mock_content).into_response())
+            }
+        }
+    } else {
+        let mock_content = generate_mock_response().to_string();
+        Ok(axum::response::Json(mock_content).into_response())
+    }
+}
+
+/// Handle Anthropic completion and extract content
+async fn handle_anthropic_completion(
+    state: AppState,
+    request: ChatCompletionRequest,
+    model: &str,
+) -> Result<Response, StatusCode> {
+    if let Some(anthropic_service) = &state.anthropic_service {
+        match anthropic_service.chat_completion(request.messages, Some(model.to_string()), request.temperature, request.max_tokens).await {
+            Ok(chat_message) => {
+                Ok(axum::response::Json(chat_message.content).into_response())
+            }
+            Err(e) => {
+                let mock_content = generate_mock_response().to_string();
+                Ok(axum::response::Json(mock_content).into_response())
+            }
+        }
+    } else {
+        let mock_content = generate_mock_response().to_string();
+        Ok(axum::response::Json(mock_content).into_response())
+    }
+}
+
 /// Legacy API endpoint compatible with the existing frontend
 pub async fn legacy_chat_handler(
     State(state): State<AppState>,
